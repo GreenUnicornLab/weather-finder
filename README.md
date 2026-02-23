@@ -111,6 +111,25 @@ weather-alert uninstall-schedule
 > **macOS permission note:** If notifications don't appear when run from cron, go to
 > **System Settings → Notifications → Terminal** and enable *Allow Notifications*.
 
+## Dashboard
+
+Run the visual weather dashboard locally:
+
+```bash
+pip install -e ".[ui]"
+streamlit run app/app.py
+```
+
+Then open http://localhost:8501 in your browser.
+
+Features:
+- Search any location by name
+- Current conditions hero card with large temperature display
+- 1 / 3 / 7 / 16-day forecast selector
+- Interactive temperature range and precipitation charts (Plotly)
+- Alert indicators when thresholds are exceeded
+- Apple-inspired dark UI — no Streamlit defaults visible
+
 ## Running Tests
 
 ```bash

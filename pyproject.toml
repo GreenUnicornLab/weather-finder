@@ -18,6 +18,7 @@ dependencies = ["requests"]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+ui = ["streamlit", "plotly"]
 
 [project.scripts]
 weather-alert = "weather_alert.cli:main"
