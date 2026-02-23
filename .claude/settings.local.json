@@ -1,0 +1,82 @@
+{
+  "permissions": {
+    "allow": []
+  },
+  "enableAllProjectMcpServers": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/Cellar/claude-mpm/5.6.32/libexec/lib/python3.11/site-packages/claude_mpm/scripts/claude-hook-handler.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/Cellar/claude-mpm/5.6.32/libexec/lib/python3.11/site-packages/claude_mpm/scripts/claude-hook-handler.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/Cellar/claude-mpm/5.6.32/libexec/lib/python3.11/site-packages/claude_mpm/scripts/claude-hook-handler.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/Cellar/claude-mpm/5.6.32/libexec/lib/python3.11/site-packages/claude_mpm/scripts/claude-hook-handler.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/Cellar/claude-mpm/5.6.32/libexec/lib/python3.11/site-packages/claude_mpm/scripts/claude-hook-handler.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/Cellar/claude-mpm/5.6.32/libexec/lib/python3.11/site-packages/claude_mpm/scripts/claude-hook-handler.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/opt/homebrew/Cellar/claude-mpm/5.6.32/libexec/lib/python3.11/site-packages/claude_mpm/scripts/claude-hook-handler.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
