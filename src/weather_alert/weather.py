@@ -11,7 +11,9 @@ API docs: https://open-meteo.com/en/docs
 """
 
 import requests
+import time
 from datetime import datetime
+from weather_alert.utils import with_retry, DEFAULT_LOG_PATH
 
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
@@ -64,9 +66,12 @@ def fetch_forecast(latitude: float, longitude: float, forecast_hours: int = 6, t
         "timezone": "auto",
     }
 
-    response = requests.get(OPEN_METEO_URL, params=params, timeout=10)
-    response.raise_for_status()
-    data = response.json()
+    def _call():
+        r = requests.get(OPEN_METEO_URL, params=params, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    data = with_retry(_call, label="Open-Meteo forecast API")
 
     return _parse_hourly(data, forecast_hours, target_time_str=target_time_str)
 
@@ -160,9 +165,12 @@ def fetch_daily_forecast(latitude: float, longitude: float, forecast_days: int =
         "timezone": "auto",
     }
 
-    response = requests.get(OPEN_METEO_URL, params=params, timeout=10)
-    response.raise_for_status()
-    data = response.json()
+    def _call():
+        r = requests.get(OPEN_METEO_URL, params=params, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    data = with_retry(_call, label="Open-Meteo daily forecast API")
 
     daily = data["daily"]
     dates = daily["time"]

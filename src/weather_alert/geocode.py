@@ -9,6 +9,7 @@ API docs: https://open-meteo.com/en/docs/geocoding-api
 """
 
 import requests
+from weather_alert.utils import with_retry
 
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
@@ -29,9 +30,12 @@ def geocode(place: str) -> dict:
         "format": "json",
     }
 
-    response = requests.get(GEOCODING_URL, params=params, timeout=10)
-    response.raise_for_status()
-    data = response.json()
+    def _call():
+        r = requests.get(GEOCODING_URL, params=params, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    data = with_retry(_call, label=f"Geocoding API for '{place}'")
 
     results = data.get("results")
     if not results:

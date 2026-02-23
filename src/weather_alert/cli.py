@@ -26,6 +26,7 @@ from weather_alert.weather import fetch_forecast, fetch_daily_forecast
 from weather_alert.rules import evaluate_rules
 from weather_alert.notify import send_test_notification, send_weather_notification
 from weather_alert.chart import render_daily_table, render_hourly_table, _fmt_day, _fmt_hour
+from weather_alert.utils import write_last_run, read_last_run
 
 
 def cmd_run_once(args) -> None:
@@ -35,149 +36,161 @@ def cmd_run_once(args) -> None:
 
     config = load_config()
 
-    # ── Resolve location ──────────────────────────────────────
-    if args.location:
-        loc = geocode(args.location)
-        latitude = loc["latitude"]
-        longitude = loc["longitude"]
-        display_name = loc["name"]
-    else:
-        location = config["location"]
-        latitude = location["latitude"]
-        longitude = location["longitude"]
-        display_name = location["name"]
-
-    # ── Resolve target time ───────────────────────────────────
-    target_time_str = None
-    time_label = "now"
-    if args.time:
-        time_label = "forecast"
-        raw = args.time.strip()
-        if len(raw) == 5 and ":" in raw:
-            today = datetime.now().strftime("%Y-%m-%d")
-            target_time_str = f"{today}T{raw}"
-        else:
-            try:
-                dt = datetime.strptime(raw, "%Y-%m-%d %H:%M")
-                target_time_str = dt.strftime("%Y-%m-%dT%H:00")
-            except ValueError:
-                print(f"[error] Unrecognised --time format: '{raw}'. Use 'HH:MM' or 'YYYY-MM-DD HH:MM'.")
-                raise SystemExit(1)
-
-    window = getattr(args, "forecast_window", 1)
-
-    # ── Multi-day path (window >= 2) ──────────────────────────
-    if window >= 2:
-        days = min(window, 16)
-        print(f"Fetching {days}-day forecast for {display_name}...")
-        daily = fetch_daily_forecast(latitude=latitude, longitude=longitude, forecast_days=days)
-
-        print()
-        print(render_daily_table(daily, display_name))
-        print()
-
-        # Evaluate alerts per day
-        alerts_config = config["alerts"]
-        any_alerts = False
-        for day in daily:
-            day_alerts = []
-            if day["rain_probability"] >= alerts_config["rain_probability_threshold"]:
-                day_alerts.append(
-                    f"Rain probability {day['rain_probability']}% exceeds threshold of {alerts_config['rain_probability_threshold']}%"
-                )
-            if day["wind_max"] >= alerts_config["wind_speed_threshold"]:
-                day_alerts.append(
-                    f"Wind {day['wind_max']:.0f} km/h exceeds threshold of {alerts_config['wind_speed_threshold']} km/h"
-                )
-            if day["temp_min"] < alerts_config["temperature_min"]:
-                day_alerts.append(
-                    f"Min temperature {day['temp_min']}°C below threshold of {alerts_config['temperature_min']}°C"
-                )
-            for alert in day_alerts:
-                print(f"⚠️  {_fmt_day(day['date'])}: {alert}")
-                any_alerts = True
-
-        if not any_alerts:
-            print("✅ No alerts in forecast window.")
-        return
-
-    # ── Multi-hour path (window 1-24) ─────────────────────────
-    lookahead = config["alerts"]["lookahead_hours"]
-    fetch_hours = max(window, lookahead + 1)
-
-    print(f"Fetching forecast for {display_name}...")
-
     try:
-        forecast = fetch_forecast(
-            latitude=latitude,
-            longitude=longitude,
-            forecast_hours=fetch_hours,
-            target_time_str=target_time_str,
-        )
-    except RuntimeError as e:
-        print(str(e))
-        raise SystemExit(1)
+        # ── Resolve location ──────────────────────────────────────
+        if args.location:
+            loc = geocode(args.location)
+            latitude = loc["latitude"]
+            longitude = loc["longitude"]
+            display_name = loc["name"]
+        else:
+            location = config["location"]
+            latitude = location["latitude"]
+            longitude = location["longitude"]
+            display_name = location["name"]
 
-    if not forecast:
-        print("[error] No forecast data returned.")
-        raise SystemExit(1)
+        # ── Resolve target time ───────────────────────────────────
+        target_time_str = None
+        time_label = "now"
+        if args.time:
+            time_label = "forecast"
+            raw = args.time.strip()
+            if len(raw) == 5 and ":" in raw:
+                today = datetime.now().strftime("%Y-%m-%d")
+                target_time_str = f"{today}T{raw}"
+            else:
+                try:
+                    dt = datetime.strptime(raw, "%Y-%m-%d %H:%M")
+                    target_time_str = dt.strftime("%Y-%m-%dT%H:00")
+                except ValueError:
+                    print(f"[error] Unrecognised --time format: '{raw}'. Use 'HH:MM' or 'YYYY-MM-DD HH:MM'.")
+                    raise SystemExit(1)
 
-    # If window > 1, show the multi-hour table instead of a single-line report
-    if window > 1:
-        display_hours = forecast[:window]
-        print()
-        print(render_hourly_table(display_hours, display_name))
+        window = getattr(args, "forecast_window", 1)
 
-        print()
-        # Evaluate rules over the window
-        alerts = evaluate_rules(forecast[:window], config)
+        # ── Multi-day path (window >= 2) ──────────────────────────
+        if window >= 2:
+            days = min(window, 16)
+            print(f"Fetching {days}-day forecast for {display_name}...")
+            daily = fetch_daily_forecast(latitude=latitude, longitude=longitude, forecast_days=days)
+
+            print()
+            print(render_daily_table(daily, display_name))
+            print()
+
+            # Evaluate alerts per day
+            alerts_config = config["alerts"]
+            any_alerts = False
+            for day in daily:
+                day_alerts = []
+                if day["rain_probability"] >= alerts_config["rain_probability_threshold"]:
+                    day_alerts.append(
+                        f"Rain probability {day['rain_probability']}% exceeds threshold of {alerts_config['rain_probability_threshold']}%"
+                    )
+                if day["wind_max"] >= alerts_config["wind_speed_threshold"]:
+                    day_alerts.append(
+                        f"Wind {day['wind_max']:.0f} km/h exceeds threshold of {alerts_config['wind_speed_threshold']} km/h"
+                    )
+                if day["temp_min"] < alerts_config["temperature_min"]:
+                    day_alerts.append(
+                        f"Min temperature {day['temp_min']}°C below threshold of {alerts_config['temperature_min']}°C"
+                    )
+                for alert in day_alerts:
+                    print(f"⚠️  {_fmt_day(day['date'])}: {alert}")
+                    any_alerts = True
+
+            if not any_alerts:
+                print("✅ No alerts in forecast window.")
+            write_last_run("OK", "Alerts in window" if any_alerts else "No alerts in window")
+            return
+
+        # ── Multi-hour path (window 1-24) ─────────────────────────
+        lookahead = config["alerts"]["lookahead_hours"]
+        fetch_hours = max(window, lookahead + 1)
+
+        print(f"Fetching forecast for {display_name}...")
+
+        try:
+            forecast = fetch_forecast(
+                latitude=latitude,
+                longitude=longitude,
+                forecast_hours=fetch_hours,
+                target_time_str=target_time_str,
+            )
+        except RuntimeError as e:
+            print(str(e))
+            raise SystemExit(1)
+
+        if not forecast:
+            print("[error] No forecast data returned.")
+            raise SystemExit(1)
+
+        # If window > 1, show the multi-hour table instead of a single-line report
+        if window > 1:
+            display_hours = forecast[:window]
+            print()
+            print(render_hourly_table(display_hours, display_name))
+
+            print()
+            # Evaluate rules over the window
+            alerts = evaluate_rules(forecast[:window], config)
+            if alerts:
+                for alert in alerts:
+                    print(f"⚠️  ALERT: {alert}")
+            else:
+                print("✅ No alerts triggered.")
+            write_last_run("OK", f"{len(alerts)} alert(s) triggered" if alerts else "No alerts")
+            return
+
+        # ── Single-hour report (default, window == 1) ─────────────
+        current = forecast[0]
+
+        try:
+            dt = datetime.strptime(current["time"], "%Y-%m-%dT%H:%M")
+            time_str = dt.strftime("%a %d %b, %H:%M")
+        except ValueError:
+            time_str = current["time"]
+
+        max_rain = max((h.get("precipitation_probability") or 0) for h in forecast)
+        snowfall = current.get("snowfall", 0) or 0
+        snow_depth = current.get("snow_depth", 0) or 0
+
+        print(f"\n📍 {display_name} — {time_str} ({time_label})")
+        print(f"🌡  Temperature:    {current['temperature']}°C  (feels like {current['feels_like']}°C)")
+        print(f"💧 Humidity:        {current.get('humidity', 'N/A')}%")
+        print(f"🌧  Rain chance:    {max_rain}%  (next {lookahead} hours)")
+        print(f"💨 Wind:            {current['wind_speed']} km/h {current.get('wind_direction', '')}")
+        if snowfall > 0:
+            print(f"❄️  Snowfall:        {snowfall} cm")
+        if snow_depth > 0:
+            print(f"🏔️  Snow depth:      {snow_depth} cm on ground")
+
+        alerts = evaluate_rules(forecast, config)
+
         if alerts:
+            print()
             for alert in alerts:
                 print(f"⚠️  ALERT: {alert}")
         else:
             print("✅ No alerts triggered.")
-        return
 
-    # ── Single-hour report (default, window == 1) ─────────────
-    current = forecast[0]
+        send_weather_notification(
+            location_line=f"{display_name} — {time_str}",
+            current=current,
+            max_rain=max_rain,
+            lookahead_hours=lookahead,
+            alerts=alerts,
+            config=config,
+        )
+        # Record last run status
+        if alerts:
+            write_last_run("OK", f"{len(alerts)} alert(s) triggered")
+        else:
+            write_last_run("OK", "No alerts")
 
-    try:
-        dt = datetime.strptime(current["time"], "%Y-%m-%dT%H:%M")
-        time_str = dt.strftime("%a %d %b, %H:%M")
-    except ValueError:
-        time_str = current["time"]
-
-    max_rain = max((h.get("precipitation_probability") or 0) for h in forecast)
-    snowfall = current.get("snowfall", 0) or 0
-    snow_depth = current.get("snow_depth", 0) or 0
-
-    print(f"\n📍 {display_name} — {time_str} ({time_label})")
-    print(f"🌡  Temperature:    {current['temperature']}°C  (feels like {current['feels_like']}°C)")
-    print(f"💧 Humidity:        {current.get('humidity', 'N/A')}%")
-    print(f"🌧  Rain chance:    {max_rain}%  (next {lookahead} hours)")
-    print(f"💨 Wind:            {current['wind_speed']} km/h {current.get('wind_direction', '')}")
-    if snowfall > 0:
-        print(f"❄️  Snowfall:        {snowfall} cm")
-    if snow_depth > 0:
-        print(f"🏔️  Snow depth:      {snow_depth} cm on ground")
-
-    alerts = evaluate_rules(forecast, config)
-
-    if alerts:
-        print()
-        for alert in alerts:
-            print(f"⚠️  ALERT: {alert}")
-    else:
-        print("✅ No alerts triggered.")
-
-    send_weather_notification(
-        location_line=f"{display_name} — {time_str}",
-        current=current,
-        max_rain=max_rain,
-        lookahead_hours=lookahead,
-        alerts=alerts,
-        config=config,
-    )
+    except RuntimeError as e:
+        write_last_run("ERROR", str(e).replace("|", "-"))
+        raise SystemExit(1)
 
 
 def cmd_test_notification(args) -> None:
@@ -279,6 +292,51 @@ def cmd_uninstall_schedule(args) -> None:
     print("[schedule] Cron job removed.")
 
 
+def cmd_status(args) -> None:
+    """Show cron job status, last run info, and log file size."""
+    import subprocess
+
+    config = load_config()
+    log_path = Path(config["log"]["path"])
+    log_dir = log_path.parent
+
+    # Check cron
+    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    cron_installed = result.returncode == 0 and "weather-alert" in result.stdout
+    cron_status = "✅ Installed" if cron_installed else "❌ Not installed"
+
+    # Read last run
+    last = read_last_run(log_dir)
+    if last:
+        last_run_time = last["timestamp"]
+        if last["status"] == "OK":
+            if "alert" in last["detail"].lower() and not last["detail"].startswith("No"):
+                last_result = f"⚠️  {last['detail']}"
+            else:
+                last_result = f"✅ {last['detail']}"
+        else:
+            last_result = f"❌ {last['detail']}"
+    else:
+        last_run_time = "Never"
+        last_result = "—"
+
+    # Log file size
+    if log_path.exists():
+        size_kb = log_path.stat().st_size // 1024
+        log_info = f"{log_path} ({size_kb} KB)"
+    else:
+        log_info = f"{log_path} (not created yet)"
+
+    sep = "─" * 45
+    print(f"\n🔧 Weather Alert — Status")
+    print(sep)
+    print(f"  Cron job:    {cron_status}")
+    print(f"  Last run:    {last_run_time}")
+    print(f"  Last result: {last_result}")
+    print(f"  Log file:    {log_info}")
+    print(sep)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="weather-alert",
@@ -310,6 +368,7 @@ def main() -> None:
     subparsers.add_parser("test-notification", help="Send a test macOS notification")
     subparsers.add_parser("install-schedule", help="Install cron job (runs every hour)")
     subparsers.add_parser("uninstall-schedule", help="Remove cron job")
+    subparsers.add_parser("status", help="Show cron job status and last run info")
 
     args = parser.parse_args()
 
@@ -318,6 +377,7 @@ def main() -> None:
         "test-notification": cmd_test_notification,
         "install-schedule": cmd_install_schedule,
         "uninstall-schedule": cmd_uninstall_schedule,
+        "status": cmd_status,
     }
     commands[args.command](args)
 
