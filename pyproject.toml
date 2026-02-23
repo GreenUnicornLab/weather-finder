@@ -28,3 +28,7 @@ where = ["src"]
 [project.urls]
 Homepage = "https://github.com/GreenUnicorn/weather-finder"
 Repository = "https://github.com/GreenUnicorn/weather-finder"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

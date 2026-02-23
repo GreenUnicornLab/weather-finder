@@ -21,6 +21,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from weather_alert import __version__
 from weather_alert.config import load_config
 from weather_alert.weather import fetch_forecast, fetch_daily_forecast
 from weather_alert.rules import evaluate_rules
@@ -29,12 +30,54 @@ from weather_alert.chart import render_daily_table, render_hourly_table, _fmt_da
 from weather_alert.utils import write_last_run, read_last_run
 
 
+def _print_single_hour_report(
+    current: dict,
+    display_name: str,
+    time_str: str,
+    time_label: str,
+    max_rain: int,
+    lookahead: int,
+    alerts: list[str],
+) -> None:
+    """Print the single-hour weather report to stdout.
+
+    Args:
+        current: Current-hour forecast dict.
+        display_name: Location name to display.
+        time_str: Formatted time string (e.g. 'Mon 23 Feb, 15:00').
+        time_label: 'now' or 'forecast'.
+        max_rain: Max precipitation probability across the lookahead window.
+        lookahead: Number of lookahead hours shown for rain.
+        alerts: List of triggered alert strings.
+    """
+    print(f"\n📍 {display_name} — {time_str} ({time_label})")
+    print(f"🌡  Temperature:    {current['temperature']}°C  (feels like {current['feels_like']}°C)")
+    print(f"💧 Humidity:        {current.get('humidity', 'N/A')}%")
+    print(f"🌧  Rain chance:    {max_rain}%  (next {lookahead} hours)")
+    print(f"💨 Wind:            {current['wind_speed']} km/h {current.get('wind_direction', '')}")
+    snowfall = current.get("snowfall", 0) or 0
+    snow_depth = current.get("snow_depth", 0) or 0
+    if snowfall > 0:
+        print(f"❄️  Snowfall:        {snowfall} cm")
+    if snow_depth > 0:
+        print(f"🏔️  Snow depth:      {snow_depth} cm on ground")
+    if alerts:
+        print()
+        for alert in alerts:
+            print(f"⚠️  ALERT: {alert}")
+    else:
+        print("✅ No alerts triggered.")
+
+
 def cmd_run_once(args) -> None:
     """Fetch weather, print report, evaluate rules, send notifications."""
-    from datetime import datetime
     from weather_alert.geocode import geocode
 
-    config = load_config()
+    try:
+        config = load_config()
+    except FileNotFoundError:
+        print("[error] config.toml not found. Copy config.toml.example to config.toml and edit it.")
+        raise SystemExit(1)
 
     try:
         # ── Resolve location ──────────────────────────────────────
@@ -152,27 +195,17 @@ def cmd_run_once(args) -> None:
             time_str = current["time"]
 
         max_rain = max((h.get("precipitation_probability") or 0) for h in forecast)
-        snowfall = current.get("snowfall", 0) or 0
-        snow_depth = current.get("snow_depth", 0) or 0
-
-        print(f"\n📍 {display_name} — {time_str} ({time_label})")
-        print(f"🌡  Temperature:    {current['temperature']}°C  (feels like {current['feels_like']}°C)")
-        print(f"💧 Humidity:        {current.get('humidity', 'N/A')}%")
-        print(f"🌧  Rain chance:    {max_rain}%  (next {lookahead} hours)")
-        print(f"💨 Wind:            {current['wind_speed']} km/h {current.get('wind_direction', '')}")
-        if snowfall > 0:
-            print(f"❄️  Snowfall:        {snowfall} cm")
-        if snow_depth > 0:
-            print(f"🏔️  Snow depth:      {snow_depth} cm on ground")
-
         alerts = evaluate_rules(forecast, config)
 
-        if alerts:
-            print()
-            for alert in alerts:
-                print(f"⚠️  ALERT: {alert}")
-        else:
-            print("✅ No alerts triggered.")
+        _print_single_hour_report(
+            current=current,
+            display_name=display_name,
+            time_str=time_str,
+            time_label=time_label,
+            max_rain=max_rain,
+            lookahead=lookahead,
+            alerts=alerts,
+        )
 
         send_weather_notification(
             location_line=f"{display_name} — {time_str}",
@@ -195,7 +228,11 @@ def cmd_run_once(args) -> None:
 
 def cmd_test_notification(args) -> None:
     """Send a fake alert to verify macOS notifications work."""
-    config = load_config()
+    try:
+        config = load_config()
+    except FileNotFoundError:
+        print("[error] config.toml not found. Copy config.toml.example to config.toml and edit it.")
+        raise SystemExit(1)
     send_test_notification(config)
 
 
@@ -211,7 +248,11 @@ def cmd_install_schedule(args) -> None:
         raise SystemExit(1)
 
     # Resolve the logs directory to an absolute path
-    config = load_config()
+    try:
+        config = load_config()
+    except FileNotFoundError:
+        print("[error] config.toml not found. Copy config.toml.example to config.toml and edit it.")
+        raise SystemExit(1)
     log_path = Path(config["log"]["path"]).resolve()
     log_dir = log_path.parent
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -296,7 +337,11 @@ def cmd_status(args) -> None:
     """Show cron job status, last run info, and log file size."""
     import subprocess
 
-    config = load_config()
+    try:
+        config = load_config()
+    except FileNotFoundError:
+        print("[error] config.toml not found. Copy config.toml.example to config.toml and edit it.")
+        raise SystemExit(1)
     log_path = Path(config["log"]["path"])
     log_dir = log_path.parent
 
@@ -342,6 +387,7 @@ def main() -> None:
         prog="weather-alert",
         description="macOS weather alert tool using Open-Meteo",
     )
+    parser.add_argument("--version", action="version", version=f"weather-alert {__version__}")
     subparsers = parser.add_subparsers(dest="command", metavar="command")
     subparsers.required = True
 

@@ -11,7 +11,6 @@ API docs: https://open-meteo.com/en/docs
 """
 
 import requests
-import time
 from datetime import datetime
 from weather_alert.utils import with_retry, DEFAULT_LOG_PATH
 
@@ -31,11 +30,30 @@ HOURLY_VARIABLES = [
     "snow_depth",
 ]
 
+# Open-Meteo uses terrain-based elevation correction automatically when latitude/longitude
+# are provided, so mountain locations like Sierra Nevada return accurate temperature and
+# snowfall data without any extra configuration.
+
+DAILY_VARIABLES = [
+    "temperature_2m_max",
+    "temperature_2m_min",
+    "precipitation_sum",
+    "precipitation_probability_max",
+    "snowfall_sum",
+    "snow_depth_max",
+    "windspeed_10m_max",
+    "winddirection_10m_dominant",
+]
+
 
 def degrees_to_compass(degrees: float) -> str:
-    """
-    Convert a wind direction in degrees (0-360) to a 16-point compass label.
-    0° = N, 90° = E, 180° = S, 270° = W.
+    """Convert a wind bearing in degrees to a 16-point compass label.
+
+    Args:
+        degrees: Wind direction in degrees (0–360, where 0 = North).
+
+    Returns:
+        Compass label such as 'N', 'NNE', 'NW', etc.
     """
     compass = [
         "N", "NNE", "NE", "ENE",
@@ -48,15 +66,28 @@ def degrees_to_compass(degrees: float) -> str:
     return compass[index]
 
 
-def fetch_forecast(latitude: float, longitude: float, forecast_hours: int = 6, target_time_str: str | None = None) -> list[dict]:
-    """
-    Fetch hourly forecast from Open-Meteo and return a list of dicts,
-    one per hour, for the next `forecast_hours` hours.
+def fetch_forecast(
+    latitude: float,
+    longitude: float,
+    forecast_hours: int = 6,
+    target_time_str: str | None = None,
+) -> list[dict]:
+    """Fetch an hourly weather forecast from Open-Meteo.
 
-    Each dict has keys: time, temperature, feels_like,
-    precipitation_probability, wind_speed, weathercode.
+    Args:
+        latitude: Location latitude in decimal degrees.
+        longitude: Location longitude in decimal degrees.
+        forecast_hours: Number of hourly entries to return.
+        target_time_str: ISO-format hour string ('YYYY-MM-DDTHH:00') to start
+            from. Defaults to the current local hour.
 
-    Raises requests.HTTPError on API error.
+    Returns:
+        List of dicts, one per hour, each containing temperature, feels_like,
+        precipitation_probability, wind_speed, wind_direction, weathercode,
+        humidity, snowfall, and snow_depth.
+
+    Raises:
+        RuntimeError: If all retry attempts fail.
     """
     params = {
         "latitude": latitude,
@@ -76,16 +107,24 @@ def fetch_forecast(latitude: float, longitude: float, forecast_hours: int = 6, t
     return _parse_hourly(data, forecast_hours, target_time_str=target_time_str)
 
 
-def _parse_hourly(data: dict, forecast_hours: int, target_time_str: str | None = None) -> list[dict]:
-    """
-    Extract `forecast_hours` hours of data starting from a given or current hour.
+def _parse_hourly(
+    data: dict,
+    forecast_hours: int,
+    target_time_str: str | None = None,
+) -> list[dict]:
+    """Extract a slice of hourly forecast data starting from a given time.
 
-    Open-Meteo returns a full-day array starting at midnight. We locate
-    the target hour by matching the formatted datetime string, then
-    slice forward from there.
+    Args:
+        data: Raw JSON response from the Open-Meteo hourly API.
+        forecast_hours: Number of hourly entries to extract.
+        target_time_str: ISO hour string to start from. Uses current local
+            hour if None.
 
-    If target_time_str is provided, use it as the start time; otherwise
-    use the current local hour.
+    Returns:
+        List of hourly forecast dicts.
+
+    Raises:
+        RuntimeError: If the target time is not found in the API response.
     """
     hourly = data["hourly"]
     times = hourly["time"]
@@ -101,10 +140,8 @@ def _parse_hourly(data: dict, forecast_hours: int, target_time_str: str | None =
 
     if target_time_str is not None:
         lookup_str = target_time_str
-        time_label = "requested"
     else:
         lookup_str = datetime.now().strftime("%Y-%m-%dT%H:00")
-        time_label = "current"
 
     try:
         start = times.index(lookup_str)
@@ -133,29 +170,25 @@ def _parse_hourly(data: dict, forecast_hours: int, target_time_str: str | None =
     return result
 
 
-# Open-Meteo uses terrain-based elevation correction automatically when latitude/longitude
-# are provided, so mountain locations like Sierra Nevada return accurate temperature and
-# snowfall data without any extra configuration.
+def fetch_daily_forecast(
+    latitude: float,
+    longitude: float,
+    forecast_days: int = 7,
+) -> list[dict]:
+    """Fetch a daily aggregated forecast from Open-Meteo.
 
-DAILY_VARIABLES = [
-    "temperature_2m_max",
-    "temperature_2m_min",
-    "precipitation_sum",
-    "precipitation_probability_max",
-    "snowfall_sum",
-    "snow_depth_max",
-    "windspeed_10m_max",
-    "winddirection_10m_dominant",
-]
+    Args:
+        latitude: Location latitude in decimal degrees.
+        longitude: Location longitude in decimal degrees.
+        forecast_days: Number of days to fetch (max 16).
 
+    Returns:
+        List of dicts, one per day, containing date, temp_max, temp_min,
+        precip_mm, rain_probability, snowfall_cm, snow_depth_cm, wind_max,
+        and wind_direction.
 
-def fetch_daily_forecast(latitude: float, longitude: float, forecast_days: int = 7) -> list[dict]:
-    """
-    Fetch a daily aggregated forecast from Open-Meteo.
-
-    Returns a list of dicts, one per day, with keys:
-      date, temp_max, temp_min, precip_mm, rain_probability,
-      snowfall_cm, snow_depth_cm, wind_max, wind_direction
+    Raises:
+        RuntimeError: If all retry attempts fail.
     """
     params = {
         "latitude": latitude,

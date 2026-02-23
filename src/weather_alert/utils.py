@@ -11,15 +11,30 @@ from pathlib import Path
 
 DEFAULT_LOG_PATH = Path("logs/weather_alert.log")
 MAX_ATTEMPTS = 3
-RETRY_DELAY = 5  # seconds
+RETRY_DELAY_SECONDS = 5
 
 
-def with_retry(fn, *args, label: str = "API call", log_path: Path = DEFAULT_LOG_PATH, **kwargs):
-    """
-    Call fn(*args, **kwargs) up to MAX_ATTEMPTS times.
+def with_retry(
+    fn: callable,
+    *args,
+    label: str = "API call",
+    log_path: Path = DEFAULT_LOG_PATH,
+    **kwargs,
+) -> any:
+    """Call a function up to MAX_ATTEMPTS times, retrying on any exception.
 
-    On each failure prints a warning and waits RETRY_DELAY seconds.
-    If all attempts fail, logs the error and raises RuntimeError.
+    Args:
+        fn: Zero-argument callable to invoke (wrap args in a closure).
+        *args: Positional arguments forwarded to fn (kept for signature compat).
+        label: Human-readable name for the call, used in warning messages.
+        log_path: Path to the log file for recording final failures.
+        **kwargs: Keyword arguments forwarded to fn.
+
+    Returns:
+        The return value of fn on success.
+
+    Raises:
+        RuntimeError: If all MAX_ATTEMPTS attempts raise exceptions.
     """
     last_error = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -30,12 +45,12 @@ def with_retry(fn, *args, label: str = "API call", log_path: Path = DEFAULT_LOG_
             if attempt < MAX_ATTEMPTS:
                 print(
                     f"[weather] {label} failed (attempt {attempt}/{MAX_ATTEMPTS}): "
-                    f"{e}. Retrying in {RETRY_DELAY}s..."
+                    f"{e}. Retrying in {RETRY_DELAY_SECONDS}s..."
                 )
-                time.sleep(RETRY_DELAY)
+                time.sleep(RETRY_DELAY_SECONDS)
             else:
-                msg = f"[weather] All {MAX_ATTEMPTS} attempts failed. Check your internet connection."
-                print(msg)
+                msg = f"All {MAX_ATTEMPTS} attempts failed for {label}. Check your internet connection."
+                print(f"[weather] {msg}")
                 _log_error(str(e), log_path=log_path)
                 raise RuntimeError(msg) from e
 
@@ -43,7 +58,12 @@ def with_retry(fn, *args, label: str = "API call", log_path: Path = DEFAULT_LOG_
 
 
 def _log_error(message: str, log_path: Path = DEFAULT_LOG_PATH) -> None:
-    """Append a timestamped ERROR line to the log file."""
+    """Append a timestamped ERROR line to the log file.
+
+    Args:
+        message: Error description to log.
+        log_path: Destination log file path.
+    """
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -53,11 +73,19 @@ def _log_error(message: str, log_path: Path = DEFAULT_LOG_PATH) -> None:
         pass  # Never crash on logging failure
 
 
-def write_last_run(status: str, detail: str, log_dir: Path = Path("logs")) -> None:
-    """
-    Append a status line to logs/last_run.txt after each run-once.
+def write_last_run(
+    status: str,
+    detail: str,
+    log_dir: Path = Path("logs"),
+) -> None:
+    """Append a status record to logs/last_run.txt after each run.
 
-    Format: 2026-02-23 20:00:01|OK|No alerts
+    Format: ``2026-02-23 20:00:01|OK|No alerts``
+
+    Args:
+        status: 'OK' or 'ERROR'.
+        detail: Human-readable summary of the run outcome.
+        log_dir: Directory containing last_run.txt.
     """
     try:
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -69,9 +97,14 @@ def write_last_run(status: str, detail: str, log_dir: Path = Path("logs")) -> No
 
 
 def read_last_run(log_dir: Path = Path("logs")) -> dict | None:
-    """
-    Read the last line of logs/last_run.txt.
-    Returns dict with keys: timestamp, status, detail — or None if file missing.
+    """Read the most recent run record from logs/last_run.txt.
+
+    Args:
+        log_dir: Directory containing last_run.txt.
+
+    Returns:
+        Dict with keys timestamp, status, detail — or None if file is missing
+        or empty.
     """
     path = log_dir / "last_run.txt"
     if not path.exists():

@@ -202,3 +202,35 @@ def test_evaluate_rules_returns_empty_when_no_trigger():
     }
     alerts = evaluate_rules(forecast, config)
     assert alerts == []
+
+
+# ---------------------------------------------------------------------------
+# degrees_to_compass
+# ---------------------------------------------------------------------------
+
+from weather_alert.weather import degrees_to_compass
+
+
+def test_compass_north():
+    assert degrees_to_compass(0) == "N"
+
+def test_compass_north_wraparound():
+    assert degrees_to_compass(360) == "N"
+
+def test_compass_east():
+    assert degrees_to_compass(90) == "E"
+
+def test_compass_south():
+    assert degrees_to_compass(180) == "S"
+
+def test_compass_west():
+    assert degrees_to_compass(270) == "W"
+
+def test_compass_northeast():
+    assert degrees_to_compass(45) == "NE"
+
+def test_compass_southwest():
+    assert degrees_to_compass(225) == "SW"
+
+def test_compass_nne():
+    assert degrees_to_compass(22.5) == "NNE"

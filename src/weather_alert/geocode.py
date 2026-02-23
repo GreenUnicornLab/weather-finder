@@ -15,13 +15,18 @@ GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
 
 def geocode(place: str) -> dict:
-    """
-    Look up coordinates for a place name.
+    """Look up coordinates for a place name using Open-Meteo Geocoding.
 
-    Returns a dict with keys: latitude, longitude, name
-    where name is the canonical "City, Country" string.
+    Args:
+        place: Human-readable place name, e.g. 'Tokyo' or 'London, UK'.
 
-    Raises SystemExit with a clear message if not found.
+    Returns:
+        Dict with keys: latitude (float), longitude (float), name (str).
+        The name is a canonical 'City, Region, Country' string.
+
+    Raises:
+        SystemExit: If no results are found for the place name.
+        RuntimeError: If all API retry attempts fail.
     """
     params = {
         "name": place,

@@ -9,8 +9,10 @@ All rendering functions return strings ready to print.
 """
 
 import os
-import math
 from datetime import datetime
+
+FALLBACK_TERMINAL_WIDTH: int = 80
+BAR_LABEL_RESERVE: int = 30  # characters reserved for label + value outside the bar
 
 
 # ─────────────────────────────────────────────────────────────
@@ -18,20 +20,40 @@ from datetime import datetime
 # ─────────────────────────────────────────────────────────────
 
 def _fmt_day(date_str: str) -> str:
-    """Format 'YYYY-MM-DD' as 'Mon 24 Feb'."""
+    """Format a date string as a short human-readable label.
+
+    Args:
+        date_str: Date in 'YYYY-MM-DD' format.
+
+    Returns:
+        Formatted string like 'Mon 24 Feb'.
+    """
     dt = datetime.strptime(date_str, "%Y-%m-%d")
     return dt.strftime("%a %d %b")
 
 
 def _fmt_hour(time_str: str) -> str:
-    """Format 'YYYY-MM-DDTHH:MM' as 'HH:00'."""
+    """Format an ISO datetime string as a short hour label.
+
+    Args:
+        time_str: Datetime in 'YYYY-MM-DDTHH:MM' format.
+
+    Returns:
+        Formatted string like 'HH:00'.
+    """
     dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M")
     return dt.strftime("%H:%M")
 
 
 def render_daily_table(days: list[dict], location_line: str) -> str:
-    """
-    Render a multi-day forecast as a fixed-width ASCII table.
+    """Render a multi-day forecast as a fixed-width ASCII table.
+
+    Args:
+        days: List of daily forecast dicts from fetch_daily_forecast.
+        location_line: Display name for the location header.
+
+    Returns:
+        Multi-line string containing the formatted table.
     """
     has_snow = any(d["snowfall_cm"] > 0 or d["snow_depth_cm"] > 0 for d in days)
 
@@ -77,8 +99,14 @@ def render_daily_table(days: list[dict], location_line: str) -> str:
 
 
 def render_hourly_table(hours: list[dict], location_line: str) -> str:
-    """
-    Render a multi-hour forecast as a fixed-width ASCII table.
+    """Render a multi-hour forecast as a fixed-width ASCII table.
+
+    Args:
+        hours: List of hourly forecast dicts from fetch_forecast.
+        location_line: Display name for the location header.
+
+    Returns:
+        Multi-line string containing the formatted table.
     """
     has_snow = any(h.get("snowfall", 0) > 0 or h.get("snow_depth", 0) > 0 for h in hours)
 
@@ -117,7 +145,16 @@ def render_hourly_table(hours: list[dict], location_line: str) -> str:
 # ─────────────────────────────────────────────────────────────
 
 def _bar(value: float, max_value: float, bar_width: int) -> str:
-    """Render a single █/░ bar scaled to bar_width."""
+    """Render a single filled/empty bar scaled to bar_width.
+
+    Args:
+        value: The data value to represent.
+        max_value: The maximum value (maps to full bar width).
+        bar_width: Total character width of the bar.
+
+    Returns:
+        String of '█' and '░' characters of length bar_width.
+    """
     if max_value == 0:
         filled = 0
     else:
@@ -133,21 +170,25 @@ def render_bar_chart(
     unit: str = "",
     bar_width: int | None = None,
 ) -> str:
-    """
-    Render a labelled horizontal bar chart.
+    """Render a labelled horizontal bar chart.
 
-    Example output:
-      Temperature (max°C)
-      Mon │████████░░░░░░░░│  3°
-      Tue │██████░░░░░░░░░░│  1°
+    Args:
+        labels: List of row label strings.
+        values: List of numeric values corresponding to each label.
+        title: Chart title printed above the bars.
+        unit: Optional unit suffix appended to each value (e.g. '°C', ' cm').
+        bar_width: Width of the bar in characters. Auto-detected from terminal if None.
+
+    Returns:
+        Multi-line string containing the chart.
     """
     if bar_width is None:
         try:
             terminal_width = os.get_terminal_size().columns
         except OSError:
-            terminal_width = 80
+            terminal_width = FALLBACK_TERMINAL_WIDTH
         # Reserve space for: label(10) + " │" + bar + "│ " + value(8)
-        bar_width = max(10, terminal_width - 30)
+        bar_width = max(10, terminal_width - BAR_LABEL_RESERVE)
 
     max_val = max(values) if values else 1
     if max_val == 0:
@@ -164,8 +205,13 @@ def render_bar_chart(
 
 
 def render_daily_charts(days: list[dict]) -> str:
-    """
-    Render temperature and (if relevant) snow depth bar charts for daily data.
+    """Render temperature and (if relevant) snow depth bar charts for daily data.
+
+    Args:
+        days: List of daily forecast dicts from fetch_daily_forecast.
+
+    Returns:
+        Multi-line string containing one or two bar charts.
     """
     labels = [_fmt_day(d["date"]) for d in days]
     temp_values = [d["temp_max"] for d in days]
@@ -179,8 +225,8 @@ def render_daily_charts(days: list[dict]) -> str:
     try:
         terminal_width = os.get_terminal_size().columns
     except OSError:
-        terminal_width = 80
-    bar_width = max(10, terminal_width - 30)
+        terminal_width = FALLBACK_TERMINAL_WIDTH
+    bar_width = max(10, terminal_width - BAR_LABEL_RESERVE)
     label_w = max(len(l) for l in labels)
     max_shifted = max(temp_shifted) if temp_shifted else 1
     if max_shifted == 0:

@@ -13,11 +13,23 @@ evaluate_rules() calls all checks and returns a list of triggered alerts.
 
 from typing import Optional
 
+TEMPERATURE_LOOKAHEAD_HOURS: int = 3  # hours used for temperature/feels-like checks
 
-def check_rain(forecast: list[dict], threshold: int, lookahead_hours: int) -> Optional[str]:
-    """
-    Trigger if precipitation_probability exceeds `threshold` in
-    the next `lookahead_hours` hours.
+
+def check_rain(
+    forecast: list[dict],
+    threshold: int,
+    lookahead_hours: int,
+) -> str | None:
+    """Check if precipitation probability exceeds threshold in the lookahead window.
+
+    Args:
+        forecast: List of hourly forecast dicts.
+        threshold: Precipitation probability percent to trigger (inclusive).
+        lookahead_hours: Number of hours ahead to examine.
+
+    Returns:
+        Alert message string if triggered, None otherwise.
     """
     window = forecast[:lookahead_hours]
     for hour in window:
@@ -30,10 +42,15 @@ def check_rain(forecast: list[dict], threshold: int, lookahead_hours: int) -> Op
     return None
 
 
-def check_wind(forecast: list[dict], threshold: float) -> Optional[str]:
-    """
-    Trigger if windspeed in the next hour exceeds `threshold` km/h.
-    We only look one hour ahead for wind because it changes quickly.
+def check_wind(forecast: list[dict], threshold: float) -> str | None:
+    """Check if wind speed in the next hour exceeds the threshold.
+
+    Args:
+        forecast: List of hourly forecast dicts.
+        threshold: Wind speed in km/h to trigger (inclusive).
+
+    Returns:
+        Alert message string if triggered, None otherwise.
     """
     if not forecast:
         return None
@@ -47,13 +64,41 @@ def check_wind(forecast: list[dict], threshold: float) -> Optional[str]:
     return None
 
 
+def check_temperature(forecast: list[dict], min_temp: float) -> str | None:
+    """Check if temperature drops below minimum in the next TEMPERATURE_LOOKAHEAD_HOURS hours.
 
-def check_feels_like(forecast: list[dict], min_feels_like: float) -> Optional[str]:
+    Args:
+        forecast: List of hourly forecast dicts.
+        min_temp: Minimum temperature in °C (exclusive lower bound).
+
+    Returns:
+        Alert message string if triggered, None otherwise.
     """
-    Trigger if apparent_temperature drops below `min_feels_like` in next 3 hours.
-    Feels-like (wind chill / heat index) can diverge significantly from actual temp.
+    window = forecast[:TEMPERATURE_LOOKAHEAD_HOURS]
+    for hour in window:
+        temp = hour.get("temperature", float("inf"))
+        if temp is not None and temp < min_temp:
+            return (
+                f"Cold temperature: {temp}°C at {hour['time']} "
+                f"(min temperature: {min_temp}°C)"
+            )
+    return None
+
+
+def check_feels_like(
+    forecast: list[dict],
+    min_feels_like: float,
+) -> str | None:
+    """Check if apparent temperature drops below minimum in the next 3 hours.
+
+    Args:
+        forecast: List of hourly forecast dicts.
+        min_feels_like: Minimum apparent temperature in °C (exclusive lower bound).
+
+    Returns:
+        Alert message string if triggered, None otherwise.
     """
-    window = forecast[:3]
+    window = forecast[:TEMPERATURE_LOOKAHEAD_HOURS]
     for hour in window:
         feels = hour.get("feels_like", float("inf"))
         if feels is not None and feels < min_feels_like:
@@ -65,12 +110,16 @@ def check_feels_like(forecast: list[dict], min_feels_like: float) -> Optional[st
 
 
 def evaluate_rules(forecast: list[dict], config: dict) -> list[str]:
-    """
-    Run all checks against the forecast using thresholds from config.
-    Returns a list of alert strings (empty list = no alerts).
+    """Run all configured alert checks against a forecast.
+
+    Args:
+        forecast: List of hourly forecast dicts.
+        config: Loaded configuration dict (must contain 'alerts' section).
+
+    Returns:
+        List of triggered alert message strings. Empty if no alerts.
     """
     alerts_config = config["alerts"]
-    alerts = []
 
     checks = [
         check_rain(
@@ -81,6 +130,10 @@ def evaluate_rules(forecast: list[dict], config: dict) -> list[str]:
         check_wind(
             forecast,
             threshold=alerts_config["wind_speed_threshold"],
+        ),
+        check_temperature(
+            forecast,
+            min_temp=alerts_config["temperature_min"],
         ),
         check_feels_like(
             forecast,

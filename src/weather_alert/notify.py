@@ -9,42 +9,46 @@ No third-party library needed — it's built into macOS.
 """
 
 import subprocess
-import logging
 from datetime import datetime
 from pathlib import Path
 
 
 def send_notifications(alerts: list[str], config: dict) -> None:
-    """
-    Send all triggered alerts via the notification channels
-    configured in config["notifications"].
+    """Send triggered alerts via all configured notification channels.
+
+    Args:
+        alerts: List of alert message strings to send.
+        config: Loaded configuration dict with 'notifications' section.
     """
     notif_config = config["notifications"]
 
     for alert in alerts:
         if notif_config.get("macos", False):
-            _send_macos_notification(alert)
+            _send_macos_notification("Weather Alert", alert)
         if notif_config.get("log", False):
             _log_alert(alert, config)
 
 
 def send_test_notification(config: dict) -> None:
-    """
-    Send a fake alert to verify that macOS notifications are working.
-    Called by: weather-alert test-notification
+    """Send a hardcoded test notification to verify macOS setup.
+
+    Args:
+        config: Loaded configuration dict with 'notifications' section.
     """
     title = "Weather Alert Test"
     message = "This is a test notification."
     print(f"Sending test notification — title: {title!r}, message: {message!r}")
-    _send_macos_notification("Weather Alert Test", "This is a test notification.")
+    _send_macos_notification(title, message)
     if config.get("notifications", {}).get("log", False):
         _log_alert(message, config)
 
 
 def _send_macos_notification(title: str, message: str) -> None:
-    """
-    Use osascript to display a macOS native notification.
-    Caller supplies both title and message as plain strings.
+    """Display a macOS native notification using osascript.
+
+    Args:
+        title: Notification title string.
+        message: Notification body string.
     """
     safe_message = message.replace('"', '\\"')
     safe_title = title.replace('"', '\\"')
@@ -70,14 +74,17 @@ def send_weather_notification(
     alerts: list[str],
     config: dict,
 ) -> None:
-    """
-    Always send a macOS notification with the full weather summary.
-    Called on every run-once regardless of whether alerts triggered.
+    """Send a full weather summary as a macOS notification.
 
-    Title:   "📍 Barcelona — Tue 24 Feb, 14:00"
-    Message: "🌡 12.3°C (feels 9.1°C) · 💧 67% · 🌧 0% rain · 💨 18 km/h NW · ✅ No alerts"
-             or with alerts:
-             "🌡 12.3°C (feels 9.1°C) · 💧 67% · 🌧 65% rain · 💨 18 km/h NW · ⚠️ Rain above threshold"
+    Always fires on every run-once, regardless of alert state.
+
+    Args:
+        location_line: Display string like 'New York — Mon 23 Feb, 15:00'.
+        current: Current-hour forecast dict with temperature, feels_like, etc.
+        max_rain: Maximum precipitation probability across the lookahead window.
+        lookahead_hours: Window size used for rain probability display.
+        alerts: List of triggered alert strings (empty = no alerts).
+        config: Loaded configuration dict with 'notifications' section.
     """
     if not config.get("notifications", {}).get("macos", False):
         return
@@ -115,9 +122,11 @@ def send_weather_notification(
 
 
 def _log_alert(message: str, config: dict) -> None:
-    """
-    Append a timestamped line to the log file specified in config["log"]["path"].
-    Creates parent directories if they don't exist.
+    """Append a timestamped alert line to the configured log file.
+
+    Args:
+        message: Text to log.
+        config: Loaded configuration dict with 'log.path' key.
     """
     log_path = Path(config["log"]["path"])
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -125,5 +134,8 @@ def _log_alert(message: str, config: dict) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_line = f"[{timestamp}] {message}\n"
 
-    with open(log_path, "a") as f:
-        f.write(log_line)
+    try:
+        with open(log_path, "a") as f:
+            f.write(log_line)
+    except OSError as e:
+        print(f"[notify] Failed to write log: {e}")

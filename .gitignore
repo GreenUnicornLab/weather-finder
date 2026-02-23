@@ -5,10 +5,12 @@ __pycache__/
 dist/
 build/
 .venv/
+.pytest_cache/
 
 # Project-specific
 config.toml
 logs/
+last_run.txt
 
 # macOS
 .DS_Store

@@ -17,10 +17,17 @@ DEFAULT_CONFIG_PATH = Path("config.toml")
 
 
 def load_config(path: Path = DEFAULT_CONFIG_PATH) -> dict:
-    """
-    Load config from a TOML file and return it as a nested dict.
-    Raises FileNotFoundError if the file doesn't exist.
-    Raises ValueError if required keys are missing.
+    """Load and validate a TOML configuration file.
+
+    Args:
+        path: Path to the TOML config file.
+
+    Returns:
+        Nested dict of configuration values.
+
+    Raises:
+        FileNotFoundError: If the config file does not exist.
+        ValueError: If required keys or sections are missing.
     """
     if not path.exists():
         raise FileNotFoundError(
@@ -36,7 +43,14 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> dict:
 
 
 def _validate(config: dict) -> None:
-    """Check that required top-level sections and keys exist."""
+    """Validate that all required config sections and keys are present.
+
+    Args:
+        config: Parsed TOML config dict.
+
+    Raises:
+        ValueError: If any required section or key is absent.
+    """
     required_sections = ["location", "alerts", "notifications", "log"]
     for section in required_sections:
         if section not in config:
