@@ -9,8 +9,8 @@ We use argparse (stdlib) rather than click because:
 Commands:
   weather-alert run-once            — fetch + evaluate + notify
   weather-alert test-notification   — send a fake alert
-  weather-alert install-schedule    — install launchd plist
-  weather-alert uninstall-schedule  — remove launchd plist
+  weather-alert install-schedule    — install cron job
+  weather-alert uninstall-schedule  — remove cron job
 """
 
 import argparse
@@ -121,79 +121,96 @@ def cmd_test_notification(args) -> None:
 
 
 def cmd_install_schedule(args) -> None:
-    """Install the launchd plist to ~/Library/LaunchAgents/."""
+    """Install an hourly cron job to run weather-alert run-once."""
     import shutil
     import subprocess
 
-    # Find the template relative to this file
-    template_path = Path(__file__).parent.parent.parent / "launchd" / "com.user.weather-alert.plist.template"
-    if not template_path.exists():
-        # Try relative to cwd (when running from project root)
-        template_path = Path("launchd/com.user.weather-alert.plist.template")
-
-    if not template_path.exists():
-        print(f"Error: plist template not found at {template_path}")
-        sys.exit(1)
-
-    # Find the weather-alert binary
+    # Resolve the weather-alert binary path
     binary = shutil.which("weather-alert")
     if not binary:
-        print("Error: weather-alert not found in PATH. Is it installed? Run: pip install -e .")
-        sys.exit(1)
+        print("[error] Could not find weather-alert binary. Make sure it is installed with pip install -e .")
+        raise SystemExit(1)
 
-    # Resolve log directory to an absolute path
+    # Resolve the logs directory to an absolute path
     config = load_config()
     log_path = Path(config["log"]["path"]).resolve()
     log_dir = log_path.parent
     log_dir.mkdir(parents=True, exist_ok=True)
+    cron_log = log_dir / "cron.log"
 
-    # Read template and substitute placeholders
-    template = template_path.read_text()
-    plist_content = (
-        template
-        .replace("{{WEATHER_ALERT_BINARY}}", binary)
-        .replace("{{LOG_DIR}}", str(log_dir))
-    )
+    # Build the cron line: run at minute 0 of every hour
+    cron_line = f"0 * * * * {binary} run-once >> {cron_log} 2>&1"
 
-    # Write to ~/Library/LaunchAgents/
-    dest = Path.home() / "Library" / "LaunchAgents" / "com.user.weather-alert.plist"
-    dest.write_text(plist_content)
-    print(f"Plist written to: {dest}")
-
-    # Load with launchctl
+    # Read the existing crontab (empty string if none exists yet)
     result = subprocess.run(
-        ["launchctl", "load", str(dest)],
+        ["crontab", "-l"],
         capture_output=True,
         text=True,
     )
-    if result.returncode == 0:
-        print("Launchd job loaded. weather-alert will run every hour.")
-    else:
-        print(f"Warning: launchctl load failed: {result.stderr.strip()}")
+    # crontab -l exits non-zero when no crontab exists — treat that as empty
+    existing = result.stdout if result.returncode == 0 else ""
+
+    # Guard against double-installation
+    if "weather-alert" in existing:
+        print("[schedule] Already installed. Run uninstall-schedule first.")
+        raise SystemExit(0)
+
+    # Append the new line (ensure there is a trailing newline before appending)
+    updated = existing.rstrip("\n")
+    if updated:
+        updated += "\n"
+    updated += cron_line + "\n"
+
+    # Write back via crontab -
+    write_result = subprocess.run(
+        ["crontab", "-"],
+        input=updated,
+        capture_output=True,
+        text=True,
+    )
+    if write_result.returncode != 0:
+        print(f"[error] Failed to write crontab: {write_result.stderr.strip()}")
+        raise SystemExit(1)
+
+    print("[schedule] Cron job installed. weather-alert will run every hour.")
+    print("[schedule] To verify: crontab -l")
 
 
 def cmd_uninstall_schedule(args) -> None:
-    """Unload and remove the launchd plist."""
+    """Remove the weather-alert cron job."""
     import subprocess
 
-    dest = Path.home() / "Library" / "LaunchAgents" / "com.user.weather-alert.plist"
-
-    if not dest.exists():
-        print(f"Plist not found at {dest}. Nothing to uninstall.")
-        return
-
+    # Read current crontab
     result = subprocess.run(
-        ["launchctl", "unload", str(dest)],
+        ["crontab", "-l"],
         capture_output=True,
         text=True,
     )
-    if result.returncode == 0:
-        print("Launchd job unloaded.")
-    else:
-        print(f"Warning: launchctl unload returned: {result.stderr.strip()}")
+    if result.returncode != 0:
+        # No crontab at all — nothing to remove
+        print("[schedule] No crontab found. Nothing to remove.")
+        return
 
-    dest.unlink()
-    print(f"Removed: {dest}")
+    lines = result.stdout.splitlines(keepends=True)
+    filtered = [line for line in lines if "weather-alert" not in line]
+
+    if len(filtered) == len(lines):
+        print("[schedule] No weather-alert cron job found. Nothing to remove.")
+        return
+
+    # Write filtered lines back (or clear the crontab if now empty)
+    updated = "".join(filtered)
+    write_result = subprocess.run(
+        ["crontab", "-"],
+        input=updated,
+        capture_output=True,
+        text=True,
+    )
+    if write_result.returncode != 0:
+        print(f"[error] Failed to write crontab: {write_result.stderr.strip()}")
+        raise SystemExit(1)
+
+    print("[schedule] Cron job removed.")
 
 
 def main() -> None:
@@ -218,8 +235,8 @@ def main() -> None:
         help='Forecast for a specific time, e.g. "15:00" or "2026-02-25 09:00"',
     )
     subparsers.add_parser("test-notification", help="Send a test macOS notification")
-    subparsers.add_parser("install-schedule", help="Install launchd job (runs every hour)")
-    subparsers.add_parser("uninstall-schedule", help="Remove launchd job")
+    subparsers.add_parser("install-schedule", help="Install cron job (runs every hour)")
+    subparsers.add_parser("uninstall-schedule", help="Remove cron job")
 
     args = parser.parse_args()
 
