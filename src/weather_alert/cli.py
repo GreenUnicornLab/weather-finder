@@ -21,7 +21,7 @@ from pathlib import Path
 from weather_alert.config import load_config
 from weather_alert.weather import fetch_forecast
 from weather_alert.rules import evaluate_rules
-from weather_alert.notify import send_notifications, send_test_notification
+from weather_alert.notify import send_test_notification, send_weather_notification
 
 
 def cmd_run_once(args) -> None:
@@ -109,9 +109,18 @@ def cmd_run_once(args) -> None:
         print()
         for alert in alerts:
             print(f"⚠️  ALERT: {alert}")
-        send_notifications(alerts, config)
     else:
         print("✅ No alerts triggered.")
+
+    # Always send the full weather summary as a macOS notification
+    send_weather_notification(
+        location_line=f"{display_name} — {time_str}",
+        current=current,
+        max_rain=max_rain,
+        lookahead_hours=lookahead,
+        alerts=alerts,
+        config=config,
+    )
 
 
 def cmd_test_notification(args) -> None:

@@ -33,18 +33,15 @@ def send_test_notification(config: dict) -> None:
     title = "Weather Alert Test"
     message = "This is a test notification."
     print(f"Sending test notification — title: {title!r}, message: {message!r}")
-    _send_macos_notification(message, title=title)
+    _send_macos_notification("Weather Alert Test", "This is a test notification.")
     if config.get("notifications", {}).get("log", False):
         _log_alert(message, config)
 
 
-def _send_macos_notification(message: str, title: str = "Weather Alert") -> None:
+def _send_macos_notification(title: str, message: str) -> None:
     """
     Use osascript to display a macOS native notification.
-
-    The AppleScript command is: display notification "..." with title "..."
-    We pass the script as a list element (no shell=True), so we only need
-    to escape AppleScript's own quote character: the double-quote.
+    Caller supplies both title and message as plain strings.
     """
     safe_message = message.replace('"', '\\"')
     safe_title = title.replace('"', '\\"')
@@ -55,12 +52,63 @@ def _send_macos_notification(message: str, title: str = "Weather Alert") -> None
         capture_output=True,
         text=True,
     )
-
     if result.returncode != 0:
         err = result.stderr.strip() or result.stdout.strip()
         print(f"[notify] osascript failed: {err}")
     else:
         print("[notify] macOS notification sent.")
+
+
+def send_weather_notification(
+    location_line: str,
+    current: dict,
+    max_rain: int,
+    lookahead_hours: int,
+    alerts: list[str],
+    config: dict,
+) -> None:
+    """
+    Always send a macOS notification with the full weather summary.
+    Called on every run-once regardless of whether alerts triggered.
+
+    Title:   "📍 Barcelona — Tue 24 Feb, 14:00"
+    Message: "🌡 12.3°C (feels 9.1°C) · 💧 67% · 🌧 0% rain · 💨 18 km/h NW · ✅ No alerts"
+             or with alerts:
+             "🌡 12.3°C (feels 9.1°C) · 💧 67% · 🌧 65% rain · 💨 18 km/h NW · ⚠️ Rain above threshold"
+    """
+    if not config.get("notifications", {}).get("macos", False):
+        return
+
+    title = f"📍 {location_line}"
+
+    temp = current.get("temperature", "?")
+    feels = current.get("feels_like", "?")
+    humidity = current.get("humidity", "?")
+    wind_speed = current.get("wind_speed", "?")
+    wind_dir = current.get("wind_direction", "")
+
+    # Build alert suffix
+    if alerts:
+        # Strip long detail from alert strings — keep just the key phrase
+        alert_summary = ", ".join(
+            a.split(":")[0] if ":" in a else a for a in alerts
+        )
+        alert_part = f"⚠️ {alert_summary}"
+    else:
+        alert_part = "✅ No alerts"
+
+    message = (
+        f"🌡 {temp}°C (feels {feels}°C) · "
+        f"💧 {humidity}% · "
+        f"🌧 {max_rain}% rain · "
+        f"💨 {wind_speed} km/h {wind_dir} · "
+        f"{alert_part}"
+    )
+
+    _send_macos_notification(title, message)
+
+    if config.get("notifications", {}).get("log", False):
+        _log_alert(f"Notification sent: {message}", config)
 
 
 def _log_alert(message: str, config: dict) -> None:
