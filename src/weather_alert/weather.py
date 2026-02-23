@@ -8,7 +8,7 @@ API docs: https://open-meteo.com/en/docs
 """
 
 import requests
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
@@ -38,7 +38,7 @@ def fetch_forecast(latitude: float, longitude: float, forecast_hours: int = 6) -
         "latitude": latitude,
         "longitude": longitude,
         "hourly": ",".join(HOURLY_VARIABLES),
-        "forecast_days": 1,
+        "forecast_days": 2,   # cover late-night lookahead into next day
         "timezone": "auto",
     }
 
@@ -51,10 +51,11 @@ def fetch_forecast(latitude: float, longitude: float, forecast_hours: int = 6) -
 
 def _parse_hourly(data: dict, forecast_hours: int) -> list[dict]:
     """
-    Extract the next `forecast_hours` hours from the raw API response.
+    Extract `forecast_hours` hours of data starting from the current local hour.
 
-    The API returns parallel arrays indexed by hour. We zip them into
-    a list of dicts for easier processing downstream.
+    Open-Meteo returns a full-day array starting at midnight. We locate
+    today's current hour by matching the formatted datetime string, then
+    slice forward from there.
     """
     hourly = data["hourly"]
     times = hourly["time"]
@@ -65,16 +66,20 @@ def _parse_hourly(data: dict, forecast_hours: int) -> list[dict]:
     codes = hourly["weathercode"]
     humidity = hourly["relativehumidity_2m"]
 
-    now = datetime.now(timezone.utc)
-    result = []
+    # Match current local hour to the API's time strings (format: "YYYY-MM-DDTHH:00")
+    now_str = datetime.now().strftime("%Y-%m-%dT%H:00")
+    try:
+        start = times.index(now_str)
+    except ValueError:
+        raise RuntimeError(
+            f"Current hour '{now_str}' not found in forecast times. "
+            f"Available range: {times[0]} to {times[-1]}"
+        )
 
-    for i, time_str in enumerate(times):
-        # Open-Meteo returns ISO-8601 strings without timezone when timezone=auto
-        # We compare by index position: the first entry is the current hour
-        if i >= forecast_hours:
-            break
+    result = []
+    for i in range(start, min(start + forecast_hours, len(times))):
         result.append({
-            "time": time_str,
+            "time": times[i],
             "temperature": temps[i],
             "feels_like": feels[i],
             "precipitation_probability": precip[i],
