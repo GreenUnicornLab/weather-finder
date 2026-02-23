@@ -25,32 +25,88 @@ from weather_alert.notify import send_notifications, send_test_notification
 
 
 def cmd_run_once(args) -> None:
-    """Fetch weather, evaluate rules, print summary, send alerts if triggered."""
+    """Fetch weather, evaluate rules, send alerts if triggered."""
+    from datetime import datetime
+    from weather_alert.geocode import geocode
+
     config = load_config()
 
-    location = config["location"]
+    # Resolve location: --location flag overrides config.toml
+    if args.location:
+        loc = geocode(args.location)
+        latitude = loc["latitude"]
+        longitude = loc["longitude"]
+        display_name = loc["name"]
+    else:
+        location = config["location"]
+        latitude = location["latitude"]
+        longitude = location["longitude"]
+        display_name = location["name"]
 
-    forecast = fetch_forecast(
-        latitude=location["latitude"],
-        longitude=location["longitude"],
-        forecast_hours=config["alerts"]["lookahead_hours"] + 1,
-    )
+    # Resolve target time: --time flag or current hour
+    target_time_str = None
+    time_label = "now"
+    if args.time:
+        time_label = "forecast"
+        raw = args.time.strip()
+        # Accept "HH:MM" (assume today) or "YYYY-MM-DD HH:MM"
+        if len(raw) == 5 and ":" in raw:
+            # Just HH:MM — use today's date
+            today = datetime.now().strftime("%Y-%m-%d")
+            target_time_str = f"{today}T{raw}"
+        else:
+            # Full datetime — parse and reformat
+            try:
+                dt = datetime.strptime(raw, "%Y-%m-%d %H:%M")
+                target_time_str = dt.strftime("%Y-%m-%dT%H:00")
+            except ValueError:
+                print(f"[error] Unrecognised --time format: '{raw}'. Use 'HH:MM' or 'YYYY-MM-DD HH:MM'.")
+                raise SystemExit(1)
+
+    print(f"Fetching forecast for {display_name}...")
+
+    try:
+        forecast = fetch_forecast(
+            latitude=latitude,
+            longitude=longitude,
+            forecast_hours=config["alerts"]["lookahead_hours"] + 1,
+            target_time_str=target_time_str,
+        )
+    except RuntimeError as e:
+        print(str(e))
+        raise SystemExit(1)
+
+    if not forecast:
+        print("[error] No forecast data returned.")
+        raise SystemExit(1)
 
     current = forecast[0]
-    rain_chance = max(h["precipitation_probability"] for h in forecast)
-    time_str = current["time"]
-    dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M")
-    formatted_time = dt.strftime("%a %d %b, %H:%M")
 
-    print(f"📍 {location['name']} — {formatted_time}")
+    # Parse and format the display time
+    try:
+        dt = datetime.strptime(current["time"], "%Y-%m-%dT%H:%M")
+        time_str = dt.strftime("%a %d %b, %H:%M")
+    except ValueError:
+        time_str = current["time"]
+
+    # Max rain across the lookahead window
+    max_rain = max(
+        (h.get("precipitation_probability") or 0) for h in forecast
+    )
+    lookahead = config["alerts"]["lookahead_hours"]
+
+    # Print weather report
+    print(f"\n📍 {display_name} — {time_str} ({time_label})")
     print(f"🌡  Temperature:    {current['temperature']}°C  (feels like {current['feels_like']}°C)")
-    print(f"💧 Humidity:        {current['humidity']}%")
-    print(f"🌧  Rain chance:    {rain_chance}%  (next {config['alerts']['lookahead_hours']} hours)")
-    print(f"💨 Wind speed:      {current['wind_speed']} km/h")
+    print(f"💧 Humidity:        {current.get('humidity', 'N/A')}%")
+    print(f"🌧  Rain chance:    {max_rain}%  (next {lookahead} hours)")
+    print(f"💨 Wind:            {current['wind_speed']} km/h {current.get('wind_direction', '')}")
 
+    # Evaluate rules
     alerts = evaluate_rules(forecast, config)
 
     if alerts:
+        print()
         for alert in alerts:
             print(f"⚠️  ALERT: {alert}")
         send_notifications(alerts, config)
@@ -148,7 +204,19 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", metavar="command")
     subparsers.required = True
 
-    subparsers.add_parser("run-once", help="Fetch weather and send alerts if triggered")
+    p_run = subparsers.add_parser("run-once", help="Fetch weather and send alerts if triggered")
+    p_run.add_argument(
+        "--location",
+        metavar="PLACE",
+        default=None,
+        help='Look up coordinates by place name, e.g. "Tokyo" or "London, UK"',
+    )
+    p_run.add_argument(
+        "--time",
+        metavar="TIME",
+        default=None,
+        help='Forecast for a specific time, e.g. "15:00" or "2026-02-25 09:00"',
+    )
     subparsers.add_parser("test-notification", help="Send a test macOS notification")
     subparsers.add_parser("install-schedule", help="Install launchd job (runs every hour)")
     subparsers.add_parser("uninstall-schedule", help="Remove launchd job")
