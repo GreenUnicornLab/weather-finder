@@ -11,8 +11,6 @@ or None if everything looks fine.
 evaluate_rules() calls all checks and returns a list of triggered alerts.
 """
 
-from typing import Optional
-
 TEMPERATURE_LOOKAHEAD_HOURS: int = 3  # hours used for temperature/feels-like checks
 
 
@@ -77,7 +75,7 @@ def check_temperature(forecast: list[dict], min_temp: float) -> str | None:
     window = forecast[:TEMPERATURE_LOOKAHEAD_HOURS]
     for hour in window:
         temp = hour.get("temperature", float("inf"))
-        if temp is not None and temp < min_temp:
+        if temp < min_temp:
             return (
                 f"Cold temperature: {temp}°C at {hour['time']} "
                 f"(min temperature: {min_temp}°C)"
@@ -101,7 +99,7 @@ def check_feels_like(
     window = forecast[:TEMPERATURE_LOOKAHEAD_HOURS]
     for hour in window:
         feels = hour.get("feels_like", float("inf"))
-        if feels is not None and feels < min_feels_like:
+        if feels < min_feels_like:
             return (
                 f"Feels very cold: {feels}°C at {hour['time']} "
                 f"(min feels-like: {min_feels_like}°C)"
@@ -143,3 +141,35 @@ def evaluate_rules(forecast: list[dict], config: dict) -> list[str]:
 
     # Filter out None values (rules that didn't trigger)
     return [alert for alert in checks if alert is not None]
+
+
+def evaluate_daily_rules(day: dict, config: dict) -> list[str]:
+    """Run alert checks against a single daily forecast entry.
+
+    Args:
+        day: A daily forecast dict from fetch_daily_forecast, containing
+            rain_probability, wind_max, and temp_min keys.
+        config: Loaded configuration dict (must contain 'alerts' section).
+
+    Returns:
+        List of triggered alert message strings. Empty if no alerts.
+    """
+    alerts_config = config["alerts"]
+    day_alerts: list[str] = []
+
+    if day["rain_probability"] >= alerts_config["rain_probability_threshold"]:
+        day_alerts.append(
+            f"Rain probability {day['rain_probability']}% exceeds threshold of "
+            f"{alerts_config['rain_probability_threshold']}%"
+        )
+    if day["wind_max"] >= alerts_config["wind_speed_threshold"]:
+        day_alerts.append(
+            f"Wind {day['wind_max']:.0f} km/h exceeds threshold of "
+            f"{alerts_config['wind_speed_threshold']} km/h"
+        )
+    if day["temp_min"] < alerts_config["temperature_min"]:
+        day_alerts.append(
+            f"Min temperature {day['temp_min']}°C below threshold of "
+            f"{alerts_config['temperature_min']}°C"
+        )
+    return day_alerts

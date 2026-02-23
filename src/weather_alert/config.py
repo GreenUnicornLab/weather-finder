@@ -45,6 +45,27 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> dict:
 def _validate(config: dict) -> None:
     """Validate that all required config sections and keys are present.
 
+    Expected config schema::
+
+        [location]
+        latitude  = <float>   # decimal degrees, e.g. 40.7128
+        longitude = <float>   # decimal degrees, e.g. -74.0060
+        name      = <str>     # display name, e.g. "New York, NY"
+
+        [alerts]
+        rain_probability_threshold = <int>    # 0-100 percent
+        wind_speed_threshold       = <float>  # km/h
+        temperature_min            = <float>  # °C
+        feels_like_min             = <float>  # °C
+        lookahead_hours            = <int>    # 1-24
+
+        [notifications]
+        macos = <bool>   # true to send macOS native notifications
+        log   = <bool>   # true to log alerts to file
+
+        [log]
+        path = <str>     # relative or absolute path to the log file
+
     Args:
         config: Parsed TOML config dict.
 

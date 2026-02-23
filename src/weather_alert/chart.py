@@ -9,40 +9,15 @@ All rendering functions return strings ready to print.
 """
 
 import os
-from datetime import datetime
+
+from weather_alert.utils import fmt_day, fmt_hour
 
 FALLBACK_TERMINAL_WIDTH: int = 80
 BAR_LABEL_RESERVE: int = 30  # characters reserved for label + value outside the bar
 
-
-# ─────────────────────────────────────────────────────────────
-# Table helpers
-# ─────────────────────────────────────────────────────────────
-
-def _fmt_day(date_str: str) -> str:
-    """Format a date string as a short human-readable label.
-
-    Args:
-        date_str: Date in 'YYYY-MM-DD' format.
-
-    Returns:
-        Formatted string like 'Mon 24 Feb'.
-    """
-    dt = datetime.strptime(date_str, "%Y-%m-%d")
-    return dt.strftime("%a %d %b")
-
-
-def _fmt_hour(time_str: str) -> str:
-    """Format an ISO datetime string as a short hour label.
-
-    Args:
-        time_str: Datetime in 'YYYY-MM-DDTHH:MM' format.
-
-    Returns:
-        Formatted string like 'HH:00'.
-    """
-    dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M")
-    return dt.strftime("%H:%M")
+# Aliases kept for any callers that import these names from chart
+_fmt_day = fmt_day
+_fmt_hour = fmt_hour
 
 
 def render_daily_table(days: list[dict], location_line: str) -> str:
@@ -194,7 +169,7 @@ def render_bar_chart(
     if max_val == 0:
         max_val = 1  # avoid division by zero
 
-    label_w = max(len(l) for l in labels) if labels else 3
+    label_w = max(len(lbl) for lbl in labels) if labels else 3
     lines = [title]
     for label, value in zip(labels, values):
         bar = _bar(value, max_val, bar_width)

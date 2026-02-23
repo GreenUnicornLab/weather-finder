@@ -14,6 +14,10 @@ from weather_alert.utils import with_retry
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
 
+class LocationNotFoundError(ValueError):
+    """Raised when the geocoding API returns no results for a place name."""
+
+
 def geocode(place: str) -> dict:
     """Look up coordinates for a place name using Open-Meteo Geocoding.
 
@@ -25,7 +29,7 @@ def geocode(place: str) -> dict:
         The name is a canonical 'City, Region, Country' string.
 
     Raises:
-        SystemExit: If no results are found for the place name.
+        LocationNotFoundError: If no results are found for the place name.
         RuntimeError: If all API retry attempts fail.
     """
     params = {
@@ -44,8 +48,9 @@ def geocode(place: str) -> dict:
 
     results = data.get("results")
     if not results:
-        print(f'[error] Location "{place}" not found. Try a more specific name.')
-        raise SystemExit(1)
+        raise LocationNotFoundError(
+            f'Location "{place}" not found. Try a more specific name.'
+        )
 
     result = results[0]
     # Build a human-readable canonical name: "City, Country" (include admin1 region if available)

@@ -6,8 +6,37 @@ utils.py — Shared utilities: retry logic and failure logging.
 """
 
 import time
+from collections import deque
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+
+def fmt_day(date_str: str) -> str:
+    """Format a date string as a short human-readable label.
+
+    Args:
+        date_str: Date in 'YYYY-MM-DD' format.
+
+    Returns:
+        Formatted string like 'Mon 24 Feb'.
+    """
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    return dt.strftime("%a %d %b")
+
+
+def fmt_hour(time_str: str) -> str:
+    """Format an ISO datetime string as a short hour label.
+
+    Args:
+        time_str: Datetime in 'YYYY-MM-DDTHH:MM' format.
+
+    Returns:
+        Formatted string like 'HH:00'.
+    """
+    dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M")
+    return dt.strftime("%H:%M")
 
 DEFAULT_LOG_PATH = Path("logs/weather_alert.log")
 MAX_ATTEMPTS = 3
@@ -15,12 +44,12 @@ RETRY_DELAY_SECONDS = 5
 
 
 def with_retry(
-    fn: callable,
-    *args,
+    fn: Callable[..., Any],
+    *args: Any,
     label: str = "API call",
     log_path: Path = DEFAULT_LOG_PATH,
-    **kwargs,
-) -> any:
+    **kwargs: Any,
+) -> Any:
     """Call a function up to MAX_ATTEMPTS times, retrying on any exception.
 
     Args:
@@ -53,8 +82,6 @@ def with_retry(
                 print(f"[weather] {msg}")
                 _log_error(str(e), log_path=log_path)
                 raise RuntimeError(msg) from e
-
-    raise RuntimeError("Unexpected retry exit")  # should never reach here
 
 
 def _log_error(message: str, log_path: Path = DEFAULT_LOG_PATH) -> None:
@@ -110,10 +137,11 @@ def read_last_run(log_dir: Path = Path("logs")) -> dict | None:
     if not path.exists():
         return None
     try:
-        lines = path.read_text().strip().splitlines()
-        if not lines:
+        with open(path) as f:
+            buf: deque[str] = deque(f, maxlen=1)
+        if not buf:
             return None
-        last = lines[-1]
+        last = buf[0].rstrip("\n")
         parts = last.split("|", 2)
         if len(parts) != 3:
             return None

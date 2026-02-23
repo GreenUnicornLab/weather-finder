@@ -14,10 +14,10 @@ authors = [
 maintainers = [
   {name = "GreenUnicorn"},
 ]
-dependencies = ["requests"]
+dependencies = ["requests>=2.28"]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "pytest-cov", "mypy"]
 ui = ["streamlit", "plotly"]
 
 [project.scripts]

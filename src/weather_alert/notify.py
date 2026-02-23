@@ -46,18 +46,27 @@ def send_test_notification(config: dict) -> None:
 def _send_macos_notification(title: str, message: str) -> None:
     """Display a macOS native notification using osascript.
 
+    Passes title and message via environment variables to prevent AppleScript
+    injection through untrusted strings (e.g. weather data containing quotes
+    or backslashes).
+
     Args:
         title: Notification title string.
         message: Notification body string.
     """
-    safe_message = message.replace('"', '\\"')
-    safe_title = title.replace('"', '\\"')
-    script = f'display notification "{safe_message}" with title "{safe_title}"'
+    import os
+
+    script = (
+        'display notification (system attribute "WA_MSG") '
+        'with title (system attribute "WA_TITLE")'
+    )
+    env = {**os.environ, "WA_TITLE": title, "WA_MSG": message}
 
     result = subprocess.run(
         ["osascript", "-e", script],
         capture_output=True,
         text=True,
+        env=env,
     )
     if result.returncode != 0:
         err = result.stderr.strip() or result.stdout.strip()

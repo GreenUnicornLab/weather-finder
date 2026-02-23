@@ -24,10 +24,10 @@ from pathlib import Path
 from weather_alert import __version__
 from weather_alert.config import load_config
 from weather_alert.weather import fetch_forecast, fetch_daily_forecast
-from weather_alert.rules import evaluate_rules
+from weather_alert.rules import evaluate_rules, evaluate_daily_rules
 from weather_alert.notify import send_test_notification, send_weather_notification
-from weather_alert.chart import render_daily_table, render_hourly_table, _fmt_day, _fmt_hour
-from weather_alert.utils import write_last_run, read_last_run
+from weather_alert.chart import render_daily_table, render_hourly_table
+from weather_alert.utils import write_last_run, read_last_run, fmt_day as _fmt_day
 
 
 def _print_single_hour_report(
@@ -82,7 +82,12 @@ def cmd_run_once(args) -> None:
     try:
         # ── Resolve location ──────────────────────────────────────
         if args.location:
-            loc = geocode(args.location)
+            from weather_alert.geocode import LocationNotFoundError
+            try:
+                loc = geocode(args.location)
+            except LocationNotFoundError as e:
+                print(f"[error] {e}")
+                raise SystemExit(1)
             latitude = loc["latitude"]
             longitude = loc["longitude"]
             display_name = loc["name"]
@@ -122,22 +127,9 @@ def cmd_run_once(args) -> None:
             print()
 
             # Evaluate alerts per day
-            alerts_config = config["alerts"]
             any_alerts = False
             for day in daily:
-                day_alerts = []
-                if day["rain_probability"] >= alerts_config["rain_probability_threshold"]:
-                    day_alerts.append(
-                        f"Rain probability {day['rain_probability']}% exceeds threshold of {alerts_config['rain_probability_threshold']}%"
-                    )
-                if day["wind_max"] >= alerts_config["wind_speed_threshold"]:
-                    day_alerts.append(
-                        f"Wind {day['wind_max']:.0f} km/h exceeds threshold of {alerts_config['wind_speed_threshold']} km/h"
-                    )
-                if day["temp_min"] < alerts_config["temperature_min"]:
-                    day_alerts.append(
-                        f"Min temperature {day['temp_min']}°C below threshold of {alerts_config['temperature_min']}°C"
-                    )
+                day_alerts = evaluate_daily_rules(day, config)
                 for alert in day_alerts:
                     print(f"⚠️  {_fmt_day(day['date'])}: {alert}")
                     any_alerts = True

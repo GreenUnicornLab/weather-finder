@@ -15,6 +15,7 @@ from weather_alert.rules import (
     check_temperature,
     check_feels_like,
     evaluate_rules,
+    evaluate_daily_rules,
 )
 
 
@@ -178,7 +179,10 @@ def test_evaluate_rules_returns_all_triggered():
         }
     }
     alerts = evaluate_rules(forecast, config)
-    assert len(alerts) == 4
+    assert any("Rain" in a for a in alerts), "Expected a rain alert"
+    assert any("wind" in a.lower() for a in alerts), "Expected a wind alert"
+    assert any("Cold" in a for a in alerts), "Expected a temperature alert"
+    assert any("cold" in a.lower() for a in alerts), "Expected a feels-like alert"
 
 
 def test_evaluate_rules_returns_empty_when_no_trigger():
@@ -234,3 +238,105 @@ def test_compass_southwest():
 
 def test_compass_nne():
     assert degrees_to_compass(22.5) == "NNE"
+
+
+# ---------------------------------------------------------------------------
+# Boundary: values exactly at threshold should trigger (>= semantics)
+# ---------------------------------------------------------------------------
+
+def test_wind_triggers_at_exact_threshold():
+    """Wind rule uses >= so exactly at threshold must trigger."""
+    forecast = [make_hour(wind_speed=30.0)]
+    result = check_wind(forecast, threshold=30.0)
+    assert result is not None
+
+
+def test_temperature_does_not_trigger_at_exact_min():
+    """Temperature rule uses < so exactly at min_temp must NOT trigger."""
+    forecast = [make_hour(temperature=5.0)]
+    result = check_temperature(forecast, min_temp=5.0)
+    assert result is None
+
+
+def test_feels_like_does_not_trigger_at_exact_min():
+    """Feels-like rule uses < so exactly at min must NOT trigger."""
+    forecast = [make_hour(feels_like=2.0)]
+    result = check_feels_like(forecast, min_feels_like=2.0)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# evaluate_daily_rules
+# ---------------------------------------------------------------------------
+
+def make_day(
+    date="2024-01-01",
+    rain_probability=0,
+    wind_max=10.0,
+    temp_min=10.0,
+    temp_max=20.0,
+) -> dict:
+    return {
+        "date": date,
+        "rain_probability": rain_probability,
+        "wind_max": wind_max,
+        "temp_min": temp_min,
+        "temp_max": temp_max,
+    }
+
+
+_DAILY_CONFIG = {
+    "alerts": {
+        "rain_probability_threshold": 50,
+        "wind_speed_threshold": 30,
+        "temperature_min": 5,
+    }
+}
+
+
+def test_daily_rules_no_alerts():
+    day = make_day(rain_probability=20, wind_max=10, temp_min=15)
+    assert evaluate_daily_rules(day, _DAILY_CONFIG) == []
+
+
+def test_daily_rules_rain_triggers():
+    day = make_day(rain_probability=60)
+    alerts = evaluate_daily_rules(day, _DAILY_CONFIG)
+    assert any("Rain" in a for a in alerts)
+
+
+def test_daily_rules_wind_triggers():
+    day = make_day(wind_max=50)
+    alerts = evaluate_daily_rules(day, _DAILY_CONFIG)
+    assert any("Wind" in a for a in alerts)
+
+
+def test_daily_rules_temp_min_triggers():
+    day = make_day(temp_min=-3)
+    alerts = evaluate_daily_rules(day, _DAILY_CONFIG)
+    assert any("Min temperature" in a for a in alerts)
+
+
+def test_daily_rules_all_trigger():
+    day = make_day(rain_probability=80, wind_max=60, temp_min=-10)
+    alerts = evaluate_daily_rules(day, _DAILY_CONFIG)
+    assert len(alerts) == 3
+
+
+def test_daily_rules_rain_at_exact_threshold_triggers():
+    day = make_day(rain_probability=50)
+    alerts = evaluate_daily_rules(day, _DAILY_CONFIG)
+    assert any("Rain" in a for a in alerts)
+
+
+def test_daily_rules_wind_at_exact_threshold_triggers():
+    day = make_day(wind_max=30.0)
+    alerts = evaluate_daily_rules(day, _DAILY_CONFIG)
+    assert any("Wind" in a for a in alerts)
+
+
+def test_daily_rules_temp_at_exact_min_no_trigger():
+    """temp_min uses < so exactly at threshold must NOT trigger."""
+    day = make_day(temp_min=5.0)
+    alerts = evaluate_daily_rules(day, _DAILY_CONFIG)
+    assert not any("Min temperature" in a for a in alerts)

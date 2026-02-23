@@ -126,17 +126,20 @@ def _parse_hourly(
     Raises:
         RuntimeError: If the target time is not found in the API response.
     """
-    hourly = data["hourly"]
-    times = hourly["time"]
-    temps = hourly["temperature_2m"]
-    feels = hourly["apparent_temperature"]
-    precip = hourly["precipitation_probability"]
-    wind = hourly["windspeed_10m"]
-    wind_dir_deg = hourly["winddirection_10m"]
-    codes = hourly["weathercode"]
-    humidity = hourly["relativehumidity_2m"]
-    snowfall = hourly["snowfall"]
-    snow_depth = hourly["snow_depth"]
+    try:
+        hourly = data["hourly"]
+        times = hourly["time"]
+        temps = hourly["temperature_2m"]
+        feels = hourly["apparent_temperature"]
+        precip = hourly["precipitation_probability"]
+        wind = hourly["windspeed_10m"]
+        wind_dir_deg = hourly["winddirection_10m"]
+        codes = hourly["weathercode"]
+        humidity = hourly["relativehumidity_2m"]
+        snowfall = hourly["snowfall"]
+        snow_depth = hourly["snow_depth"]
+    except (KeyError, TypeError) as e:
+        raise RuntimeError(f"Unexpected API response structure: {e}") from e
 
     if target_time_str is not None:
         lookup_str = target_time_str
@@ -205,8 +208,11 @@ def fetch_daily_forecast(
 
     data = with_retry(_call, label="Open-Meteo daily forecast API")
 
-    daily = data["daily"]
-    dates = daily["time"]
+    try:
+        daily = data["daily"]
+        dates = daily["time"]
+    except (KeyError, TypeError) as e:
+        raise RuntimeError(f"Unexpected API response structure: {e}") from e
 
     result = []
     for i, date_str in enumerate(dates):
