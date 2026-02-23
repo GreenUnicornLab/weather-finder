@@ -22,7 +22,7 @@ from weather_alert.config import load_config
 from weather_alert.weather import fetch_forecast, fetch_daily_forecast
 from weather_alert.rules import evaluate_rules
 from weather_alert.notify import send_test_notification, send_weather_notification
-from weather_alert.chart import render_daily_table, render_hourly_table, render_daily_charts, render_bar_chart, _fmt_day, _fmt_hour
+from weather_alert.chart import render_daily_table, render_hourly_table, _fmt_day, _fmt_hour
 
 
 def cmd_run_once(args) -> None:
@@ -71,8 +71,6 @@ def cmd_run_once(args) -> None:
 
         print()
         print(render_daily_table(daily, display_name))
-        print()
-        print(render_daily_charts(daily))
         print()
 
         # Evaluate alerts per day
@@ -126,18 +124,6 @@ def cmd_run_once(args) -> None:
         display_hours = forecast[:window]
         print()
         print(render_hourly_table(display_hours, display_name))
-
-        # Simple bar chart for temperature
-        labels = [_fmt_hour(h["time"]) for h in display_hours]
-        temps = [h["temperature"] for h in display_hours]
-        print()
-        print(render_bar_chart(labels, temps, "Temperature (°C)", unit="°C"))
-
-        has_snow = any(h.get("snowfall", 0) > 0 for h in display_hours)
-        if has_snow:
-            snow_vals = [h.get("snowfall", 0) for h in display_hours]
-            print()
-            print(render_bar_chart(labels, snow_vals, "Snowfall (cm/hr)", unit=" cm"))
 
         print()
         # Evaluate rules over the window

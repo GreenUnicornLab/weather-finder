@@ -44,20 +44,6 @@ def check_wind(forecast: list[dict], threshold: float) -> Optional[str]:
     return None
 
 
-def check_temperature(forecast: list[dict], min_temp: float) -> Optional[str]:
-    """
-    Trigger if temperature_2m drops below `min_temp` in the next 3 hours.
-    """
-    window = forecast[:3]
-    for hour in window:
-        temp = hour.get("temperature", float("inf"))
-        if temp is not None and temp < min_temp:
-            return (
-                f"Cold temperature: {temp}°C at {hour['time']} "
-                f"(min: {min_temp}°C)"
-            )
-    return None
-
 
 def check_feels_like(forecast: list[dict], min_feels_like: float) -> Optional[str]:
     """
@@ -92,10 +78,6 @@ def evaluate_rules(forecast: list[dict], config: dict) -> list[str]:
         check_wind(
             forecast,
             threshold=alerts_config["wind_speed_threshold"],
-        ),
-        check_temperature(
-            forecast,
-            min_temp=alerts_config["temperature_min"],
         ),
         check_feels_like(
             forecast,
