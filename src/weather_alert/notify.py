@@ -30,11 +30,12 @@ def send_test_notification(config: dict) -> None:
     Send a fake alert to verify that macOS notifications are working.
     Called by: weather-alert test-notification
     """
-    test_message = "Test alert: notifications are working correctly."
-    _send_macos_notification(test_message)
+    title = "Weather Alert Test"
+    message = "This is a test notification."
+    print(f"Sending test notification — title: {title!r}, message: {message!r}")
+    _send_macos_notification(message, title=title)
     if config.get("notifications", {}).get("log", False):
-        _log_alert(test_message, config)
-    print(f"Test notification sent: {test_message}")
+        _log_alert(message, config)
 
 
 def _send_macos_notification(message: str, title: str = "Weather Alert") -> None:
@@ -42,25 +43,24 @@ def _send_macos_notification(message: str, title: str = "Weather Alert") -> None
     Use osascript to display a macOS native notification.
 
     The AppleScript command is: display notification "..." with title "..."
-    We pass the message as a shell argument to avoid injection issues.
+    We pass the script as a list element (no shell=True), so we only need
+    to escape AppleScript's own quote character: the double-quote.
     """
-    # Escape double quotes in the message to prevent AppleScript injection
     safe_message = message.replace('"', '\\"')
     safe_title = title.replace('"', '\\"')
-
     script = f'display notification "{safe_message}" with title "{safe_title}"'
 
-    try:
-        subprocess.run(
-            ["osascript", "-e", script],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError as e:
-        print(f"Warning: macOS notification failed: {e.stderr.strip()}")
-    except FileNotFoundError:
-        print("Warning: osascript not found — are you on macOS?")
+    result = subprocess.run(
+        ["osascript", "-e", script],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip()
+        print(f"[notify] osascript failed: {err}")
+    else:
+        print("[notify] macOS notification sent.")
 
 
 def _log_alert(message: str, config: dict) -> None:

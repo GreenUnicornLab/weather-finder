@@ -20,6 +20,7 @@ HOURLY_VARIABLES = [
     "precipitation_probability",
     "windspeed_10m",
     "weathercode",
+    "relativehumidity_2m",
 ]
 
 
@@ -62,6 +63,7 @@ def _parse_hourly(data: dict, forecast_hours: int) -> list[dict]:
     precip = hourly["precipitation_probability"]
     wind = hourly["windspeed_10m"]
     codes = hourly["weathercode"]
+    humidity = hourly["relativehumidity_2m"]
 
     now = datetime.now(timezone.utc)
     result = []
@@ -78,6 +80,7 @@ def _parse_hourly(data: dict, forecast_hours: int) -> list[dict]:
             "precipitation_probability": precip[i],
             "wind_speed": wind[i],
             "weathercode": codes[i],
+            "humidity": humidity[i],
         })
 
     return result

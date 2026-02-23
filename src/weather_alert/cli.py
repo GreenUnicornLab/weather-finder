@@ -15,6 +15,7 @@ Commands:
 
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from weather_alert.config import load_config
@@ -24,12 +25,10 @@ from weather_alert.notify import send_notifications, send_test_notification
 
 
 def cmd_run_once(args) -> None:
-    """Fetch weather, evaluate rules, send alerts if triggered."""
+    """Fetch weather, evaluate rules, print summary, send alerts if triggered."""
     config = load_config()
 
     location = config["location"]
-    print(f"Fetching forecast for {location['name']} "
-          f"({location['latitude']}, {location['longitude']})...")
 
     forecast = fetch_forecast(
         latitude=location["latitude"],
@@ -37,15 +36,26 @@ def cmd_run_once(args) -> None:
         forecast_hours=config["alerts"]["lookahead_hours"] + 1,
     )
 
+    current = forecast[0]
+    rain_chance = max(h["precipitation_probability"] for h in forecast)
+    time_str = current["time"]
+    dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M")
+    formatted_time = dt.strftime("%a %d %b, %H:%M")
+
+    print(f"📍 {location['name']} — {formatted_time}")
+    print(f"🌡  Temperature:    {current['temperature']}°C  (feels like {current['feels_like']}°C)")
+    print(f"💧 Humidity:        {current['humidity']}%")
+    print(f"🌧  Rain chance:    {rain_chance}%  (next {config['alerts']['lookahead_hours']} hours)")
+    print(f"💨 Wind speed:      {current['wind_speed']} km/h")
+
     alerts = evaluate_rules(forecast, config)
 
     if alerts:
-        print(f"{len(alerts)} alert(s) triggered:")
         for alert in alerts:
-            print(f"  • {alert}")
+            print(f"⚠️  ALERT: {alert}")
         send_notifications(alerts, config)
     else:
-        print("No alerts. Weather looks fine.")
+        print("✅ No alerts triggered.")
 
 
 def cmd_test_notification(args) -> None:
