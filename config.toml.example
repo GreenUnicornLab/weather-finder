@@ -1,0 +1,25 @@
+[location]
+latitude = 40.7128
+longitude = -74.0060
+name = "New York"
+
+[alerts]
+rain_probability_threshold = 50      # percent
+wind_speed_threshold = 30            # km/h
+temperature_min = 5                  # celsius
+feels_like_min = 2                   # celsius
+lookahead_hours = 3                  # how many hours ahead to check
+
+[schedule]
+quiet_hours_start = 22               # 10pm
+quiet_hours_end = 7                  # 7am
+
+[notifications]
+macos = true
+log = true
+email = false
+slack = false
+sound = false
+
+[log]
+path = "logs/weather_alert.log"
