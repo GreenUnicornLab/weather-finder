@@ -1,3 +1,6 @@
+# Project: weather-alert
+# Owner: GreenUnicorn
+# Built with: Claude (Anthropic)
 """
 config.py — Load and validate the TOML configuration file.
 

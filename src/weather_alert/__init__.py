@@ -1,1 +1,3 @@
-# weather_alert package
+# Project: weather-alert
+# Owner: GreenUnicorn
+# Built with: Claude (Anthropic)

@@ -1,3 +1,6 @@
+# Project: weather-alert
+# Owner: GreenUnicorn
+# Built with: Claude (Anthropic)
 """
 test_config.py — Tests for config loading and validation.
 

@@ -1,3 +1,6 @@
+# Project: weather-alert
+# Owner: GreenUnicorn
+# Built with: Claude (Anthropic)
 """
 cli.py — Command-line interface for weather-alert.
 

@@ -1,3 +1,6 @@
+# Project: weather-alert
+# Owner: GreenUnicorn
+# Built with: Claude (Anthropic)
 """
 notify.py — Send weather alerts via macOS notifications and/or log file.
 

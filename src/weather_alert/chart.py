@@ -1,3 +1,6 @@
+# Project: weather-alert
+# Owner: GreenUnicorn
+# Built with: Claude (Anthropic)
 """
 chart.py — ASCII chart and table rendering for forecast output.
 

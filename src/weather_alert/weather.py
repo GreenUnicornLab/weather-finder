@@ -1,3 +1,6 @@
+# Project: weather-alert
+# Owner: GreenUnicorn
+# Built with: Claude (Anthropic)
 """
 weather.py — Fetch hourly weather forecast from Open-Meteo.
 

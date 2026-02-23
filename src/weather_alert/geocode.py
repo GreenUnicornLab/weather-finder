@@ -1,3 +1,6 @@
+# Project: weather-alert
+# Owner: GreenUnicorn
+# Built with: Claude (Anthropic)
 """
 geocode.py — Look up coordinates for a place name using Open-Meteo Geocoding API.
 

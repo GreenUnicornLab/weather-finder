@@ -7,6 +7,13 @@ name = "weather-alert"
 version = "0.1.0"
 description = "macOS weather alert CLI tool using Open-Meteo"
 requires-python = ">=3.11"
+authors = [
+  {name = "GreenUnicorn"},
+  {name = "Claude", email = "claude@anthropic.com"},
+]
+maintainers = [
+  {name = "GreenUnicorn"},
+]
 dependencies = ["requests"]
 
 [project.optional-dependencies]
@@ -17,3 +24,7 @@ weather-alert = "weather_alert.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.urls]
+Homepage = "https://github.com/GreenUnicorn/weather-finder"
+Repository = "https://github.com/GreenUnicorn/weather-finder"
