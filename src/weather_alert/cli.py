@@ -19,19 +19,20 @@ from datetime import datetime
 from pathlib import Path
 
 from weather_alert.config import load_config
-from weather_alert.weather import fetch_forecast
+from weather_alert.weather import fetch_forecast, fetch_daily_forecast
 from weather_alert.rules import evaluate_rules
 from weather_alert.notify import send_test_notification, send_weather_notification
+from weather_alert.chart import render_daily_table, render_hourly_table, render_daily_charts, render_bar_chart, _fmt_day, _fmt_hour
 
 
 def cmd_run_once(args) -> None:
-    """Fetch weather, evaluate rules, send alerts if triggered."""
+    """Fetch weather, print report, evaluate rules, send notifications."""
     from datetime import datetime
     from weather_alert.geocode import geocode
 
     config = load_config()
 
-    # Resolve location: --location flag overrides config.toml
+    # ── Resolve location ──────────────────────────────────────
     if args.location:
         loc = geocode(args.location)
         latitude = loc["latitude"]
@@ -43,19 +44,16 @@ def cmd_run_once(args) -> None:
         longitude = location["longitude"]
         display_name = location["name"]
 
-    # Resolve target time: --time flag or current hour
+    # ── Resolve target time ───────────────────────────────────
     target_time_str = None
     time_label = "now"
     if args.time:
         time_label = "forecast"
         raw = args.time.strip()
-        # Accept "HH:MM" (assume today) or "YYYY-MM-DD HH:MM"
         if len(raw) == 5 and ":" in raw:
-            # Just HH:MM — use today's date
             today = datetime.now().strftime("%Y-%m-%d")
             target_time_str = f"{today}T{raw}"
         else:
-            # Full datetime — parse and reformat
             try:
                 dt = datetime.strptime(raw, "%Y-%m-%d %H:%M")
                 target_time_str = dt.strftime("%Y-%m-%dT%H:00")
@@ -63,13 +61,56 @@ def cmd_run_once(args) -> None:
                 print(f"[error] Unrecognised --time format: '{raw}'. Use 'HH:MM' or 'YYYY-MM-DD HH:MM'.")
                 raise SystemExit(1)
 
+    window = getattr(args, "forecast_window", 1)
+
+    # ── Multi-day path (window >= 2) ──────────────────────────
+    if window >= 2:
+        days = min(window, 16)
+        print(f"Fetching {days}-day forecast for {display_name}...")
+        daily = fetch_daily_forecast(latitude=latitude, longitude=longitude, forecast_days=days)
+
+        print()
+        print(render_daily_table(daily, display_name))
+        print()
+        print(render_daily_charts(daily))
+        print()
+
+        # Evaluate alerts per day
+        alerts_config = config["alerts"]
+        any_alerts = False
+        for day in daily:
+            day_alerts = []
+            if day["rain_probability"] >= alerts_config["rain_probability_threshold"]:
+                day_alerts.append(
+                    f"Rain probability {day['rain_probability']}% exceeds threshold of {alerts_config['rain_probability_threshold']}%"
+                )
+            if day["wind_max"] >= alerts_config["wind_speed_threshold"]:
+                day_alerts.append(
+                    f"Wind {day['wind_max']:.0f} km/h exceeds threshold of {alerts_config['wind_speed_threshold']} km/h"
+                )
+            if day["temp_min"] < alerts_config["temperature_min"]:
+                day_alerts.append(
+                    f"Min temperature {day['temp_min']}°C below threshold of {alerts_config['temperature_min']}°C"
+                )
+            for alert in day_alerts:
+                print(f"⚠️  {_fmt_day(day['date'])}: {alert}")
+                any_alerts = True
+
+        if not any_alerts:
+            print("✅ No alerts in forecast window.")
+        return
+
+    # ── Multi-hour path (window 1-24) ─────────────────────────
+    lookahead = config["alerts"]["lookahead_hours"]
+    fetch_hours = max(window, lookahead + 1)
+
     print(f"Fetching forecast for {display_name}...")
 
     try:
         forecast = fetch_forecast(
             latitude=latitude,
             longitude=longitude,
-            forecast_hours=config["alerts"]["lookahead_hours"] + 1,
+            forecast_hours=fetch_hours,
             target_time_str=target_time_str,
         )
     except RuntimeError as e:
@@ -80,29 +121,57 @@ def cmd_run_once(args) -> None:
         print("[error] No forecast data returned.")
         raise SystemExit(1)
 
+    # If window > 1, show the multi-hour table instead of a single-line report
+    if window > 1:
+        display_hours = forecast[:window]
+        print()
+        print(render_hourly_table(display_hours, display_name))
+
+        # Simple bar chart for temperature
+        labels = [_fmt_hour(h["time"]) for h in display_hours]
+        temps = [h["temperature"] for h in display_hours]
+        print()
+        print(render_bar_chart(labels, temps, "Temperature (°C)", unit="°C"))
+
+        has_snow = any(h.get("snowfall", 0) > 0 for h in display_hours)
+        if has_snow:
+            snow_vals = [h.get("snowfall", 0) for h in display_hours]
+            print()
+            print(render_bar_chart(labels, snow_vals, "Snowfall (cm/hr)", unit=" cm"))
+
+        print()
+        # Evaluate rules over the window
+        alerts = evaluate_rules(forecast[:window], config)
+        if alerts:
+            for alert in alerts:
+                print(f"⚠️  ALERT: {alert}")
+        else:
+            print("✅ No alerts triggered.")
+        return
+
+    # ── Single-hour report (default, window == 1) ─────────────
     current = forecast[0]
 
-    # Parse and format the display time
     try:
         dt = datetime.strptime(current["time"], "%Y-%m-%dT%H:%M")
         time_str = dt.strftime("%a %d %b, %H:%M")
     except ValueError:
         time_str = current["time"]
 
-    # Max rain across the lookahead window
-    max_rain = max(
-        (h.get("precipitation_probability") or 0) for h in forecast
-    )
-    lookahead = config["alerts"]["lookahead_hours"]
+    max_rain = max((h.get("precipitation_probability") or 0) for h in forecast)
+    snowfall = current.get("snowfall", 0) or 0
+    snow_depth = current.get("snow_depth", 0) or 0
 
-    # Print weather report
     print(f"\n📍 {display_name} — {time_str} ({time_label})")
     print(f"🌡  Temperature:    {current['temperature']}°C  (feels like {current['feels_like']}°C)")
     print(f"💧 Humidity:        {current.get('humidity', 'N/A')}%")
     print(f"🌧  Rain chance:    {max_rain}%  (next {lookahead} hours)")
     print(f"💨 Wind:            {current['wind_speed']} km/h {current.get('wind_direction', '')}")
+    if snowfall > 0:
+        print(f"❄️  Snowfall:        {snowfall} cm")
+    if snow_depth > 0:
+        print(f"🏔️  Snow depth:      {snow_depth} cm on ground")
 
-    # Evaluate rules
     alerts = evaluate_rules(forecast, config)
 
     if alerts:
@@ -112,7 +181,6 @@ def cmd_run_once(args) -> None:
     else:
         print("✅ No alerts triggered.")
 
-    # Always send the full weather summary as a macOS notification
     send_weather_notification(
         location_line=f"{display_name} — {time_str}",
         current=current,
@@ -242,6 +310,13 @@ def main() -> None:
         metavar="TIME",
         default=None,
         help='Forecast for a specific time, e.g. "15:00" or "2026-02-25 09:00"',
+    )
+    p_run.add_argument(
+        "--forecast-window",
+        metavar="N",
+        type=int,
+        default=1,
+        help="Hours (1-24) or days (2-16) to show as a forecast table. Default: 1 (current hour only).",
     )
     subparsers.add_parser("test-notification", help="Send a test macOS notification")
     subparsers.add_parser("install-schedule", help="Install cron job (runs every hour)")
