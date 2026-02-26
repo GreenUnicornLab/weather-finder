@@ -587,16 +587,13 @@ def main() -> None:
             line=dict(color=trend_color, width=1.5, dash="dot"),
         )
     )
-    fig_trend.update_layout(
+    fig_trend.update_layout(**{
         **PLOTLY_LAYOUT,
-        title=dict(
-            text="Mean Annual Temperature (°C)",
-            font=dict(color="#8e8e93", size=13),
-        ),
-        yaxis=dict(**PLOTLY_LAYOUT["yaxis"], ticksuffix="°C"),
-        height=300,
-        hovermode="x unified",
-    )
+        "title": dict(text="Mean Annual Temperature (°C)", font=dict(color="#8e8e93", size=13)),
+        "yaxis": dict(**PLOTLY_LAYOUT["yaxis"], ticksuffix="°C"),
+        "height": 300,
+        "hovermode": "x unified",
+    })
     st.plotly_chart(fig_trend, use_container_width=True, config={"displayModeBar": False})
 
     # ── SECTION 5: Precipitation + Snow (side-by-side) ───────
@@ -620,15 +617,12 @@ def main() -> None:
                 marker_line_width=0,
             )
         )
-        fig_precip.update_layout(
+        fig_precip.update_layout(**{
             **PLOTLY_LAYOUT,
-            title=dict(
-                text="Annual Precipitation (mm)",
-                font=dict(color="#8e8e93", size=13),
-            ),
-            yaxis=dict(**PLOTLY_LAYOUT["yaxis"], ticksuffix=" mm"),
-            height=280,
-        )
+            "title": dict(text="Annual Precipitation (mm)", font=dict(color="#8e8e93", size=13)),
+            "yaxis": dict(**PLOTLY_LAYOUT["yaxis"], ticksuffix=" mm"),
+            "height": 280,
+        })
         st.plotly_chart(
             fig_precip, use_container_width=True, config={"displayModeBar": False}
         )
