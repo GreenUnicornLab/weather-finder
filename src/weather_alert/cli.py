@@ -17,6 +17,7 @@ Commands:
 """
 
 import argparse
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -374,6 +375,60 @@ def cmd_status(args) -> None:
     print(sep)
 
 
+def cmd_history(args: argparse.Namespace) -> None:
+    """Fetch historical weather data and display analysis for a location."""
+    from pathlib import Path
+    from weather_alert.geocode import geocode, LocationNotFoundError
+    from weather_alert.history import fetch_historical
+    from weather_alert.analysis import (
+        yearly_summary,
+        temperature_trend,
+        find_extremes,
+        terminal_summary,
+    )
+
+    location = args.location
+    years = args.years
+
+    print(f"[weather] Geocoding '{location}'…")
+    try:
+        loc = geocode(location)
+    except LocationNotFoundError:
+        print(f"[weather] Location not found: {location}", file=sys.stderr)
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"[weather] Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"[weather] Fetching {years} years of historical data for {loc['name']}…")
+    try:
+        records = fetch_historical(loc["latitude"], loc["longitude"], years=years)
+    except RuntimeError as e:
+        print(f"[weather] Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    yearly = yearly_summary(records)
+    trend = temperature_trend(yearly)
+    extremes = find_extremes(yearly)
+    summary = terminal_summary(loc["name"], yearly, extremes, trend)
+
+    print()
+    print(summary)
+    print()
+
+    history_app = Path(__file__).parent.parent.parent / "app" / "history.py"
+    if history_app.exists():
+        print("[weather] Launching Streamlit dashboard…")
+        subprocess.run([
+            sys.executable, "-m", "streamlit", "run",
+            str(history_app), "--",
+            "--location", location,
+            "--years", str(years),
+        ])
+    else:
+        print(f"[weather] Dashboard not found at {history_app}", file=sys.stderr)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="weather-alert",
@@ -407,6 +462,23 @@ def main() -> None:
     subparsers.add_parser("install-schedule", help="Install cron job (runs every hour)")
     subparsers.add_parser("uninstall-schedule", help="Remove cron job")
     subparsers.add_parser("status", help="Show cron job status and last run info")
+    p_hist = subparsers.add_parser(
+        "history",
+        help="Historical weather analysis (up to 80 years)",
+    )
+    p_hist.add_argument(
+        "--location",
+        metavar="PLACE",
+        required=True,
+        help='Location to analyse, e.g. "Soldeu, Andorra"',
+    )
+    p_hist.add_argument(
+        "--years",
+        metavar="N",
+        type=int,
+        default=50,
+        help="Number of years of history (1-80, default: 50)",
+    )
 
     args = parser.parse_args()
 
@@ -416,6 +488,7 @@ def main() -> None:
         "install-schedule": cmd_install_schedule,
         "uninstall-schedule": cmd_uninstall_schedule,
         "status": cmd_status,
+        "history": cmd_history,
     }
     commands[args.command](args)
 
