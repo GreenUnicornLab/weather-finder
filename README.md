@@ -130,6 +130,23 @@ Features:
 - Alert indicators when thresholds are exceeded
 - Apple-inspired dark UI — no Streamlit defaults visible
 
+## Historical Analysis
+
+Analyse up to 80 years of weather history for any location:
+
+```bash
+weather-alert history --location "Soldeu, Andorra" --years 50
+```
+
+Opens an interactive Streamlit dashboard with:
+- **Temperature trends** — annual max/min range with warming trend line
+- **Precipitation history** — year-by-year rainfall with wettest year highlighted
+- **Snowfall patterns** — annual snowfall totals and snow day counts
+- **Monthly climatology** — average conditions per calendar month
+- **Extreme events** — hottest day, coldest day, most rain, most snow on record
+
+Data source: [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5 reanalysis, 10 km resolution, free).
+
 ## Running Tests
 
 ```bash
