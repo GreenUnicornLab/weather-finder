@@ -12,10 +12,49 @@ Season start/end: first/last day with snow_depth_max > 10 cm.
 
 from __future__ import annotations
 
+import json
+import time
 from collections import defaultdict
 from datetime import date, timedelta
+from pathlib import Path
 
 from weather_alert.history import fetch_historical
+
+# ── Disk cache ────────────────────────────────────────────────────────────────
+
+_CACHE_DIR = Path.home() / ".cache" / "weather-alert"
+_CACHE_TTL_SECONDS = 60 * 60 * 24  # 24 hours
+
+
+def _cache_path(latitude: float, longitude: float, years: int) -> Path:
+    lat_s = f"{latitude:.4f}".replace("-", "m")
+    lon_s = f"{longitude:.4f}".replace("-", "m")
+    return _CACHE_DIR / f"ski_{lat_s}_{lon_s}_{years}y.json"
+
+
+def _save_cache(path: Path, records: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    serialisable = [
+        {**r, "date": r["date"].isoformat()} for r in records
+    ]
+    with open(path, "w") as f:
+        json.dump({"ts": time.time(), "records": serialisable}, f)
+
+
+def _load_cache(path: Path) -> list[dict] | None:
+    if not path.exists():
+        return None
+    try:
+        with open(path) as f:
+            payload = json.load(f)
+        if time.time() - payload["ts"] > _CACHE_TTL_SECONDS:
+            return None
+        return [
+            {**r, "date": date.fromisoformat(r["date"])}
+            for r in payload["records"]
+        ]
+    except Exception:
+        return None
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -39,9 +78,29 @@ RATING_PRIORITY = ["EXCEPTIONAL", "EXCELLENT", "GOOD", "AVERAGE", "POOR"]
 # ── Data Fetching ─────────────────────────────────────────────────────────────
 
 
-def fetch_ski_data(latitude: float, longitude: float, years: int = 51) -> list[dict]:
-    """Fetch historical weather data; 51 years ensures current season is included."""
-    return fetch_historical(latitude, longitude, years=years)
+def fetch_ski_data(
+    latitude: float,
+    longitude: float,
+    years: int = 51,
+    force_refresh: bool = False,
+) -> list[dict]:
+    """Fetch historical weather data with local disk cache (24-hour TTL).
+
+    On cache hit, skips the API entirely — fast and rate-limit-proof.
+    Pass force_refresh=True to bypass the cache and re-fetch from the API.
+    Cache stored at ~/.cache/weather-alert/ski_*.json
+    """
+    path = _cache_path(latitude, longitude, years)
+
+    if not force_refresh:
+        cached = _load_cache(path)
+        if cached is not None:
+            print(f"[ski] Using cached data ({len(cached)} days, <24h old)")
+            return cached
+
+    records = fetch_historical(latitude, longitude, years=years)
+    _save_cache(path, records)
+    return records
 
 
 # ── Season Helpers ────────────────────────────────────────────────────────────

@@ -402,9 +402,13 @@ def cmd_ski(args: argparse.Namespace) -> None:
         print(f"[ski] Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"[ski] Fetching 51 years of snow data for {loc['name']}…")
+    force = getattr(args, "refresh", False)
+    msg = "Re-fetching" if force else "Fetching (or loading cached)"
+    print(f"[ski] {msg} 51 years of snow data for {loc['name']}…")
     try:
-        records = fetch_ski_data(loc["latitude"], loc["longitude"], years=51)
+        records = fetch_ski_data(
+            loc["latitude"], loc["longitude"], years=51, force_refresh=force
+        )
     except RuntimeError as e:
         print(f"[ski] Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -689,6 +693,12 @@ def main() -> None:
         metavar="PLACE",
         required=True,
         help='Mountain location e.g. "Soldeu, Andorra"',
+    )
+    p_ski.add_argument(
+        "--refresh",
+        action="store_true",
+        default=False,
+        help="Bypass local cache and re-fetch from API",
     )
 
     p_ski_check = subparsers.add_parser(
