@@ -130,6 +130,36 @@ Features:
 - Alert indicators when thresholds are exceeded
 - Apple-inspired dark UI — no Streamlit defaults visible
 
+## Ski Season Intelligence
+
+Predict ski season quality for any mountain resort using 50 years of historical snow data:
+
+```bash
+weather-alert ski --location "Soldeu, Andorra"
+weather-alert ski --location "Verbier, Switzerland"
+weather-alert ski --location "Niseko, Japan"
+```
+
+This command geocodes the location, fetches 50 years of daily snow records, runs pattern-matching
+against historical seasons, and prints a forecast with peak skiing windows and similar past
+seasons. It also launches an interactive Streamlit dashboard at http://localhost:8501.
+
+Identifies peak skiing windows and similar past seasons. Powered by 50 years of ERA5 reanalysis
+data via the Open-Meteo Historical API.
+
+Schedule an annual season outlook notification (runs Nov 1 at 8am):
+
+```bash
+# Install cron job (sends macOS notification on Nov 1 every year)
+weather-alert ski-schedule --location "Soldeu, Andorra"
+
+# Run manually (send notification now)
+weather-alert ski-check --location "Soldeu, Andorra"
+
+# Remove scheduled job
+weather-alert ski-unschedule
+```
+
 ## Historical Analysis
 
 Analyse up to 80 years of weather history for any location:
@@ -160,10 +190,18 @@ src/weather_alert/
 ├── cli.py       — entry point, all CLI commands
 ├── config.py    — TOML config loader and validator
 ├── weather.py   — Open-Meteo API (hourly + daily forecast)
+├── history.py   — Open-Meteo Historical Archive API
+├── analysis.py  — historical data analysis (trends, extremes)
+├── ski.py       — ski season intelligence (pattern matching, prediction)
 ├── geocode.py   — place-name → coordinates lookup
 ├── rules.py     — alert rule evaluation
 ├── notify.py    — macOS notifications and log output
 └── chart.py     — ASCII forecast tables
+
+app/
+├── app.py       — current weather Streamlit dashboard
+├── history.py   — historical weather Streamlit dashboard
+└── ski.py       — ski season intelligence Streamlit dashboard
 ```
 
 ## Credits

@@ -375,6 +375,205 @@ def cmd_status(args) -> None:
     print(sep)
 
 
+def cmd_ski(args: argparse.Namespace) -> None:
+    """Fetch ski season data, print forecast, and launch Streamlit dashboard."""
+    from pathlib import Path
+
+    from weather_alert.geocode import LocationNotFoundError, geocode
+    from weather_alert.ski import (
+        best_weeks_to_ski,
+        fetch_ski_data,
+        get_current_season_data,
+        historical_seasons,
+        predict_current_season,
+        rate_season,
+        terminal_summary,
+    )
+
+    location = args.location
+
+    print(f"[ski] Geocoding '{location}'…")
+    try:
+        loc = geocode(location)
+    except LocationNotFoundError:
+        print(f"[ski] Location not found: {location}", file=sys.stderr)
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"[ski] Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"[ski] Fetching 51 years of snow data for {loc['name']}…")
+    try:
+        records = fetch_ski_data(loc["latitude"], loc["longitude"], years=51)
+    except RuntimeError as e:
+        print(f"[ski] Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print("[ski] Analysing historical seasons…")
+    seasons = historical_seasons(records)
+    for s in seasons:
+        s["rating"] = rate_season(s, seasons)
+
+    current_data = get_current_season_data(records)
+    prediction = predict_current_season(current_data, seasons)
+    best_weeks = best_weeks_to_ski(seasons)
+
+    from datetime import date as _date
+    today = _date.today()
+    current_year = today.year if today.month >= 10 else today.year - 1
+
+    summary = terminal_summary(loc["name"], prediction, best_weeks, seasons, current_year)
+    print()
+    print(summary)
+    print()
+
+    ski_app = Path(__file__).parent.parent.parent / "app" / "ski.py"
+    if ski_app.exists():
+        print("[ski] Launching Streamlit dashboard…")
+        subprocess.Popen([
+            sys.executable, "-m", "streamlit", "run",
+            str(ski_app), "--",
+            "--location", location,
+        ])
+        print("[ski] Dashboard running at http://localhost:8501")
+    else:
+        print(f"[ski] Dashboard not found at {ski_app}", file=sys.stderr)
+
+
+def cmd_ski_check(args: argparse.Namespace) -> None:
+    """Fetch ski season data and send a macOS notification (designed for cron)."""
+    import os
+
+    from weather_alert.geocode import LocationNotFoundError, geocode
+    from weather_alert.ski import (
+        fetch_ski_data,
+        get_current_season_data,
+        historical_seasons,
+        predict_current_season,
+        rate_season,
+    )
+
+    location = args.location
+
+    try:
+        loc = geocode(location)
+    except (LocationNotFoundError, RuntimeError) as e:
+        print(f"[ski-check] Geocode error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        records = fetch_ski_data(loc["latitude"], loc["longitude"], years=51)
+    except RuntimeError as e:
+        print(f"[ski-check] Fetch error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    seasons = historical_seasons(records)
+    for s in seasons:
+        s["rating"] = rate_season(s, seasons)
+
+    current_data = get_current_season_data(records)
+    prediction = predict_current_season(current_data, seasons)
+
+    from datetime import date as _date
+    today = _date.today()
+    current_year = today.year if today.month >= 10 else today.year - 1
+    season_label = f"{current_year}-{str(current_year + 1)[-2:]}"
+
+    rating = prediction["predicted_rating"]
+    vs_avg = prediction["snowpack_vs_avg"]
+    snowpack = round(prediction["current_snowpack"])
+    abs_pct = abs(round(vs_avg))
+    direction = "above" if vs_avg >= 0 else "below"
+
+    title = f"🎿 {season_label} Ski Season Outlook"
+    message = (
+        f"{loc['name'].split(',')[0]} looks like a {rating} year. "
+        f"Snowpack {abs_pct}% {direction} avg ({snowpack}cm)."
+    )
+
+    print(f"[ski-check] {title}")
+    print(f"[ski-check] {message}")
+
+    script = (
+        'display notification (system attribute "WA_MSG") '
+        'with title (system attribute "WA_TITLE")'
+    )
+    env = {**os.environ, "WA_TITLE": title, "WA_MSG": message}
+    result = subprocess.run(
+        ["osascript", "-e", script], capture_output=True, text=True, env=env
+    )
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip()
+        print(f"[ski-check] Notification error: {err}", file=sys.stderr)
+    else:
+        print("[ski-check] Notification sent.")
+
+
+def cmd_ski_schedule(args: argparse.Namespace) -> None:
+    """Install an annual cron job: runs ski-check on Nov 1 at 8am."""
+    import shutil
+
+    binary = shutil.which("weather-alert")
+    if not binary:
+        print(
+            "[ski-schedule] Could not find weather-alert binary. "
+            "Run: pip install -e .",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    location = args.location
+    cron_line = f"0 8 1 11 * {binary} ski-check --location '{location}'"
+
+    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    existing = result.stdout if result.returncode == 0 else ""
+
+    if "weather-alert ski-check" in existing:
+        print("[ski-schedule] Ski cron job already installed. Run ski-unschedule first.")
+        sys.exit(0)
+
+    updated = existing.rstrip("\n")
+    if updated:
+        updated += "\n"
+    updated += cron_line + "\n"
+
+    write_result = subprocess.run(
+        ["crontab", "-"], input=updated, capture_output=True, text=True
+    )
+    if write_result.returncode != 0:
+        print(f"[ski-schedule] Failed to write crontab: {write_result.stderr.strip()}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"[ski-schedule] Cron job installed for {location}.")
+    print("[ski-schedule] Runs at 8am on November 1st every year.")
+    print("[ski-schedule] Verify with: crontab -l")
+
+
+def cmd_ski_unschedule(args: argparse.Namespace) -> None:
+    """Remove the ski-check cron job."""
+    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    if result.returncode != 0:
+        print("[ski-unschedule] No crontab found. Nothing to remove.")
+        return
+
+    lines = result.stdout.splitlines(keepends=True)
+    filtered = [line for line in lines if "weather-alert ski-check" not in line]
+
+    if len(filtered) == len(lines):
+        print("[ski-unschedule] No ski-check cron job found. Nothing to remove.")
+        return
+
+    updated = "".join(filtered)
+    write_result = subprocess.run(
+        ["crontab", "-"], input=updated, capture_output=True, text=True
+    )
+    if write_result.returncode != 0:
+        print(f"[ski-unschedule] Failed to write crontab: {write_result.stderr.strip()}", file=sys.stderr)
+        sys.exit(1)
+
+    print("[ski-unschedule] Ski season cron job removed.")
+
+
 def cmd_history(args: argparse.Namespace) -> None:
     """Fetch historical weather data and display analysis for a location."""
     from pathlib import Path
@@ -480,6 +679,45 @@ def main() -> None:
         help="Number of years of history (1-80, default: 50)",
     )
 
+    # ── Ski season intelligence ───────────────────────────────────────────────
+    p_ski = subparsers.add_parser(
+        "ski",
+        help="Ski season intelligence: 50-year snow analysis and forecast",
+    )
+    p_ski.add_argument(
+        "--location",
+        metavar="PLACE",
+        required=True,
+        help='Mountain location e.g. "Soldeu, Andorra"',
+    )
+
+    p_ski_check = subparsers.add_parser(
+        "ski-check",
+        help="Send ski season outlook as macOS notification (for cron)",
+    )
+    p_ski_check.add_argument(
+        "--location",
+        metavar="PLACE",
+        required=True,
+        help='Mountain location e.g. "Soldeu, Andorra"',
+    )
+
+    p_ski_sched = subparsers.add_parser(
+        "ski-schedule",
+        help="Install annual Nov 1 cron job for ski season notification",
+    )
+    p_ski_sched.add_argument(
+        "--location",
+        metavar="PLACE",
+        required=True,
+        help='Mountain location e.g. "Soldeu, Andorra"',
+    )
+
+    subparsers.add_parser(
+        "ski-unschedule",
+        help="Remove the ski season cron job",
+    )
+
     args = parser.parse_args()
 
     commands = {
@@ -489,6 +727,10 @@ def main() -> None:
         "uninstall-schedule": cmd_uninstall_schedule,
         "status": cmd_status,
         "history": cmd_history,
+        "ski": cmd_ski,
+        "ski-check": cmd_ski_check,
+        "ski-schedule": cmd_ski_schedule,
+        "ski-unschedule": cmd_ski_unschedule,
     }
     commands[args.command](args)
 
