@@ -28,7 +28,9 @@ from plotly.subplots import make_subplots
 from weather_alert.analysis import (
     find_extremes,
     monthly_climatology,
+    seasonal_breakdown,
     temperature_trend,
+    yearly_humidity,
     yearly_summary,
 )
 from weather_alert.geocode import LocationNotFoundError, geocode
@@ -487,7 +489,7 @@ def main() -> None:
     all_means = [y["avg_temp_mean"] for y in yearly]
     overall_mean = round(sum(all_means) / n_years, 1)
 
-    # ── SECTION 3: Page header + 4 stat pills ────────────────
+    # ── SECTION 3: Page header + compact summary ─────────────
 
     trend_sign = "+" if trend["slope_per_decade"] >= 0 else ""
     trend_color = (
@@ -498,41 +500,43 @@ def main() -> None:
 
     st.markdown(
         f'<h2 style="font-size:1.6rem;font-weight:700;letter-spacing:-0.03em;'
-        f'margin-bottom:0.25rem;">📅 {loc["name"]}</h2>'
-        f'<div class="condition-line" style="margin-top:0;margin-bottom:1.5rem;">'
-        f"{n_years}-year historical analysis &nbsp;·&nbsp; {start_yr}–{end_yr}"
-        f"</div>",
+        f'margin-bottom:0.25rem;">📅 {loc["name"]}</h2>',
         unsafe_allow_html=True,
     )
 
-    stat_c1, stat_c2, stat_c3, stat_c4 = st.columns(4)
-    with stat_c1:
-        st.markdown(
-            stat_html("Avg Annual Temp", f"{overall_mean}", "°C"),
-            unsafe_allow_html=True,
-        )
-    with stat_c2:
-        st.markdown(
-            stat_html(
-                "Temp Trend",
-                f'<span style="color:{trend_color}">'
-                f"{trend_sign}{trend['slope_per_decade']}</span>",
-                "°C/dec",
-            ),
-            unsafe_allow_html=True,
-        )
-    with stat_c3:
-        hottest_temp = extremes.get("hottest_year_max_temp", "—")
-        st.markdown(
-            stat_html("Record High", f"{hottest_temp}", "°C"),
-            unsafe_allow_html=True,
-        )
-    with stat_c4:
-        coldest_temp = extremes.get("coldest_year_min_temp", "—")
-        st.markdown(
-            stat_html("Record Low", f"{coldest_temp}", "°C"),
-            unsafe_allow_html=True,
-        )
+    # Build compact summary text
+    _divider = "─" * 49
+
+    def _mon_year(d: date | None) -> str:
+        if d is None:
+            return "—"
+        try:
+            return d.strftime("%b %Y")
+        except Exception:
+            return str(d)
+
+    hottest_temp = extremes.get("hottest_year_max_temp", "—")
+    coldest_temp = extremes.get("coldest_year_min_temp", "—")
+    hottest_mon = _mon_year(extremes.get("hottest_date"))
+    coldest_mon = _mon_year(extremes.get("coldest_date"))
+    wettest_yr = extremes.get("wettest_year", "—")
+    wettest_mm = extremes.get("wettest_year_precip", "—")
+    driest_yr = extremes.get("driest_year", "—")
+    driest_mm = extremes.get("driest_year_precip", "—")
+    snowiest_yr = extremes.get("snowiest_year", "—")
+    snowiest_cm = extremes.get("snowiest_year_snowfall", "—")
+    avg_snow_days = round(sum(y["snow_days"] for y in yearly) / n_years, 1)
+
+    summary_lines = [
+        f"📍 {loc['name']} — {n_years}-year Analysis ({start_yr}–{end_yr})",
+        _divider,
+        f"Avg temp: {overall_mean}°C · Trend: {trend_sign}{trend['slope_per_decade']}°C/decade ({trend['label']})",
+        f"Hottest: {hottest_temp}°C ({hottest_mon}) · Coldest: {coldest_temp}°C ({coldest_mon})",
+        f"Wettest: {wettest_yr} ({wettest_mm}mm) · Driest: {driest_yr} ({driest_mm}mm)",
+        f"Snowiest: {snowiest_yr} ({snowiest_cm}cm) · Snow days: avg {avg_snow_days}/year",
+        _divider,
+    ]
+    st.code("\n".join(summary_lines), language=None)
 
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
 
@@ -590,13 +594,57 @@ def main() -> None:
     fig_trend.update_layout(**{
         **PLOTLY_LAYOUT,
         "title": dict(text="Mean Annual Temperature (°C)", font=dict(color="#8e8e93", size=13)),
-        "yaxis": dict(**PLOTLY_LAYOUT["yaxis"], ticksuffix="°C"),
+        "yaxis": dict(autorange=True, rangemode="normal", ticksuffix="°C"),
         "height": 300,
         "hovermode": "x unified",
     })
     st.plotly_chart(fig_trend, use_container_width=True, config={"displayModeBar": False})
 
-    # ── SECTION 5: Precipitation + Snow (side-by-side) ───────
+    # ── SECTION 5: Seasonal Trends ────────────────────────────
+
+    st.subheader("SEASONAL TRENDS")
+
+    seasonal_data = seasonal_breakdown(data["records"])
+    if seasonal_data:
+        season_years = sorted(seasonal_data.keys())
+        season_year_labels = [str(y) for y in season_years]
+
+        _SEASON_COLORS = {
+            "Winter": "#636EFA",
+            "Spring": "#00CC96",
+            "Summer": "#EF553B",
+            "Autumn": "#FFA15A",
+        }
+
+        fig_seasonal = go.Figure()
+        for season_name, season_color in _SEASON_COLORS.items():
+            season_temps = [
+                seasonal_data[y].get(season_name, {}).get("avg_temp_mean")
+                for y in season_years
+            ]
+            fig_seasonal.add_trace(
+                go.Scatter(
+                    x=season_year_labels,
+                    y=season_temps,
+                    name=season_name,
+                    mode="lines+markers",
+                    line=dict(color=season_color, width=2),
+                    marker=dict(color=season_color, size=4),
+                )
+            )
+        fig_seasonal.update_layout(**{
+            **PLOTLY_LAYOUT,
+            "title": dict(
+                text="Seasonal Temperature Trends",
+                font=dict(color="#8e8e93", size=13),
+            ),
+            "yaxis": dict(autorange=True, rangemode="normal", ticksuffix="°C"),
+            "height": 320,
+            "hovermode": "x unified",
+        })
+        st.plotly_chart(fig_seasonal, use_container_width=True, config={"displayModeBar": False})
+
+    # ── SECTION 6: Precipitation + Snow (side-by-side) ───────
 
     st.markdown(
         '<div class="section-label">Precipitation &amp; Snow</div>',
@@ -620,7 +668,7 @@ def main() -> None:
         fig_precip.update_layout(**{
             **PLOTLY_LAYOUT,
             "title": dict(text="Annual Precipitation (mm)", font=dict(color="#8e8e93", size=13)),
-            "yaxis": dict(**PLOTLY_LAYOUT["yaxis"], ticksuffix=" mm"),
+            "yaxis": dict(autorange=True, rangemode="normal", ticksuffix=" mm"),
             "height": 280,
         })
         st.plotly_chart(
@@ -654,20 +702,23 @@ def main() -> None:
             ),
             secondary_y=True,
         )
-        fig_snow.update_layout(
+        fig_snow.update_layout(**{
             **PLOTLY_LAYOUT,
-            title=dict(
+            "title": dict(
                 text="Annual Snowfall & Snow Days",
                 font=dict(color="#8e8e93", size=13),
             ),
-            height=280,
-            barmode="overlay",
-        )
+            "yaxis": dict(autorange=True, rangemode="normal"),
+            "height": 280,
+            "barmode": "overlay",
+        })
         fig_snow.update_yaxes(
             ticksuffix=" cm",
             gridcolor="#2c2c2e",
             zeroline=False,
             tickfont=dict(color="#636366"),
+            autorange=True,
+            rangemode="normal",
             secondary_y=False,
         )
         fig_snow.update_yaxes(
@@ -675,13 +726,56 @@ def main() -> None:
             showgrid=False,
             zeroline=False,
             tickfont=dict(color="#636366"),
+            autorange=True,
+            rangemode="normal",
             secondary_y=True,
         )
         st.plotly_chart(
             fig_snow, use_container_width=True, config={"displayModeBar": False}
         )
 
-    # ── SECTION 6: Monthly climatology ───────────────────────
+    # ── Humidity chart (full-width, after precip + snow) ─────
+
+    humidity_data = yearly_humidity(data["records"])
+    if humidity_data:
+        humidity_years = [str(h["year"]) for h in humidity_data]
+        humidity_values = [h["avg_humidity"] for h in humidity_data]
+
+        # Linearly interpolate bar colors from #90caf9 (min) to #0a84ff (max)
+        hmin = min(humidity_values)
+        hmax = max(humidity_values)
+        hrange = hmax - hmin if hmax != hmin else 1.0
+
+        def _lerp_hex(v: float) -> str:
+            t = (v - hmin) / hrange
+            r = round(0x90 + t * (0x0a - 0x90))
+            g = round(0xca + t * (0x84 - 0xca))
+            b = round(0xf9 + t * (0xff - 0xf9))
+            return f"rgb({r},{g},{b})"
+
+        humidity_colors = [_lerp_hex(v) for v in humidity_values]
+
+        fig_humidity = go.Figure(
+            go.Bar(
+                x=humidity_years,
+                y=humidity_values,
+                name="Avg Humidity",
+                marker_color=humidity_colors,
+                marker_line_width=0,
+            )
+        )
+        fig_humidity.update_layout(**{
+            **PLOTLY_LAYOUT,
+            "title": dict(
+                text="Average Annual Humidity (%)",
+                font=dict(color="#8e8e93", size=13),
+            ),
+            "yaxis": dict(autorange=True, rangemode="normal", ticksuffix="%"),
+            "height": 280,
+        })
+        st.plotly_chart(fig_humidity, use_container_width=True, config={"displayModeBar": False})
+
+    # ── SECTION 7: Monthly climatology ───────────────────────
 
     st.markdown(
         '<div class="section-label">Monthly Climatology</div>',
@@ -726,20 +820,23 @@ def main() -> None:
         ),
         secondary_y=True,
     )
-    fig_clim.update_layout(
+    fig_clim.update_layout(**{
         **PLOTLY_LAYOUT,
-        title=dict(
+        "title": dict(
             text="Average Monthly Conditions (all years)",
             font=dict(color="#8e8e93", size=13),
         ),
-        barmode="group",
-        height=300,
-    )
+        "yaxis": dict(autorange=True, rangemode="normal"),
+        "barmode": "group",
+        "height": 300,
+    })
     fig_clim.update_yaxes(
         ticksuffix=" mm",
         gridcolor="#2c2c2e",
         zeroline=False,
         tickfont=dict(color="#636366"),
+        autorange=True,
+        rangemode="normal",
         secondary_y=False,
     )
     fig_clim.update_yaxes(
@@ -747,6 +844,8 @@ def main() -> None:
         showgrid=False,
         zeroline=False,
         tickfont=dict(color="#636366"),
+        autorange=True,
+        rangemode="normal",
         secondary_y=True,
     )
     st.plotly_chart(fig_clim, use_container_width=True, config={"displayModeBar": False})

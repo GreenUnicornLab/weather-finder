@@ -2,8 +2,10 @@
 # Owner: GreenUnicorn
 # Built with: Claude (Anthropic)
 """Tests for analysis.py — yearly_summary, monthly_climatology,
-temperature_trend, find_extremes, terminal_summary."""
+temperature_trend, find_extremes, terminal_summary, seasonal_breakdown,
+yearly_humidity."""
 
+import datetime
 import pytest
 from datetime import date
 
@@ -13,6 +15,8 @@ from weather_alert.analysis import (
     temperature_trend,
     find_extremes,
     terminal_summary,
+    seasonal_breakdown,
+    yearly_humidity,
 )
 
 
@@ -368,3 +372,243 @@ class TestTerminalSummary:
     def test_is_multiline(self):
         """A non-empty summary must span multiple lines."""
         assert "\n" in self.output
+
+
+# ---------------------------------------------------------------------------
+# seasonal_breakdown
+# ---------------------------------------------------------------------------
+
+class TestSeasonalBreakdown:
+
+    def _make_seasonal_records(self):
+        """Build records covering all 4 seasons across 2 complete years (2020 and 2021).
+
+        Season definitions used by seasonal_breakdown:
+            Winter  — Dec (shifted to next year), Jan, Feb
+            Spring  — Mar, Apr, May
+            Summer  — Jun, Jul, Aug
+            Autumn  — Sep, Oct, Nov
+        """
+        current_year = datetime.date.today().year
+        # Use years well in the past to avoid any overlap with current year
+        base_years = [current_year - 4, current_year - 3]
+        records = []
+        for yr in base_years:
+            # Winter: January and February (yr); December (yr-1) shifts into yr's Winter
+            records.append({
+                "date": date(yr, 1, 15), "temp_max": 5.0, "temp_min": -5.0,
+                "temp_mean": 0.0, "precipitation": 3.0, "snowfall": 2.0,
+                "snow_depth_max": 8.0, "wind_max": 20.0,
+            })
+            records.append({
+                "date": date(yr, 2, 15), "temp_max": 6.0, "temp_min": -4.0,
+                "temp_mean": 1.0, "precipitation": 2.0, "snowfall": 1.0,
+                "snow_depth_max": 5.0, "wind_max": 18.0,
+            })
+            # Spring: March, April, May
+            records.append({
+                "date": date(yr, 3, 15), "temp_max": 12.0, "temp_min": 2.0,
+                "temp_mean": 7.0, "precipitation": 5.0, "snowfall": 0.0,
+                "snow_depth_max": 0.0, "wind_max": 15.0,
+            })
+            records.append({
+                "date": date(yr, 5, 15), "temp_max": 18.0, "temp_min": 8.0,
+                "temp_mean": 13.0, "precipitation": 4.0, "snowfall": 0.0,
+                "snow_depth_max": 0.0, "wind_max": 12.0,
+            })
+            # Summer: June, July, August
+            records.append({
+                "date": date(yr, 7, 15), "temp_max": 28.0, "temp_min": 15.0,
+                "temp_mean": 21.0, "precipitation": 1.0, "snowfall": 0.0,
+                "snow_depth_max": 0.0, "wind_max": 10.0,
+            })
+            records.append({
+                "date": date(yr, 8, 15), "temp_max": 30.0, "temp_min": 17.0,
+                "temp_mean": 23.0, "precipitation": 0.5, "snowfall": 0.0,
+                "snow_depth_max": 0.0, "wind_max": 8.0,
+            })
+            # Autumn: September, October, November
+            records.append({
+                "date": date(yr, 9, 15), "temp_max": 20.0, "temp_min": 10.0,
+                "temp_mean": 15.0, "precipitation": 6.0, "snowfall": 0.0,
+                "snow_depth_max": 0.0, "wind_max": 14.0,
+            })
+            records.append({
+                "date": date(yr, 11, 15), "temp_max": 8.0, "temp_min": 0.0,
+                "temp_mean": 4.0, "precipitation": 7.0, "snowfall": 0.5,
+                "snow_depth_max": 1.0, "wind_max": 16.0,
+            })
+            # December of this year feeds into (yr+1)'s Winter bucket
+            records.append({
+                "date": date(yr, 12, 15), "temp_max": 4.0, "temp_min": -3.0,
+                "temp_mean": 0.5, "precipitation": 4.0, "snowfall": 1.5,
+                "snow_depth_max": 4.0, "wind_max": 22.0,
+            })
+        return records, base_years
+
+    def test_result_contains_both_years_as_keys(self):
+        """seasonal_breakdown must include both base years as top-level keys."""
+        records, base_years = self._make_seasonal_records()
+        result = seasonal_breakdown(records)
+        for yr in base_years:
+            assert yr in result, f"Expected year {yr} in result keys"
+
+    def test_each_year_has_four_seasons(self):
+        """Each year in the result must have exactly 4 season entries."""
+        records, base_years = self._make_seasonal_records()
+        result = seasonal_breakdown(records)
+        for yr in base_years:
+            seasons = set(result[yr].keys())
+            assert seasons == {"Winter", "Spring", "Summer", "Autumn"}, (
+                f"Year {yr} seasons are {seasons}"
+            )
+
+    def test_avg_temp_mean_is_float(self):
+        """avg_temp_mean for every (year, season) bucket must be a float."""
+        records, base_years = self._make_seasonal_records()
+        result = seasonal_breakdown(records)
+        for yr in base_years:
+            for season, stats in result[yr].items():
+                assert isinstance(stats["avg_temp_mean"], float), (
+                    f"{yr}/{season} avg_temp_mean is not a float"
+                )
+
+    def test_total_precipitation_is_float(self):
+        """total_precipitation for every (year, season) bucket must be a float."""
+        records, base_years = self._make_seasonal_records()
+        result = seasonal_breakdown(records)
+        for yr in base_years:
+            for season, stats in result[yr].items():
+                assert isinstance(stats["total_precipitation"], float), (
+                    f"{yr}/{season} total_precipitation is not a float"
+                )
+
+    def test_current_year_not_in_result(self):
+        """The current calendar year must never appear as a key in the result."""
+        current_year = datetime.date.today().year
+        records, _ = self._make_seasonal_records()
+        # Inject some records dated in the current year to confirm they are dropped
+        records.append({
+            "date": date(current_year, 6, 15), "temp_max": 30.0, "temp_min": 20.0,
+            "temp_mean": 25.0, "precipitation": 2.0, "snowfall": 0.0,
+            "snow_depth_max": 0.0, "wind_max": 10.0,
+        })
+        result = seasonal_breakdown(records)
+        assert current_year not in result, (
+            f"Current year {current_year} must be excluded from seasonal_breakdown result"
+        )
+
+
+# ---------------------------------------------------------------------------
+# yearly_humidity
+# ---------------------------------------------------------------------------
+
+class TestYearlyHumidity:
+
+    def _make_humidity_records(self):
+        """Build records with a mix of float and None humidity_mean values."""
+        current_year = datetime.date.today().year
+        yr_a = current_year - 3
+        yr_b = current_year - 2
+        yr_c = current_year - 1
+        return [
+            # yr_a: two records with valid humidity
+            {"date": date(yr_a, 3, 1), "temp_max": 10.0, "temp_min": 2.0,
+             "temp_mean": 6.0, "precipitation": 1.0, "snowfall": 0.0,
+             "snow_depth_max": 0.0, "wind_max": 10.0, "humidity_mean": 70.0},
+            {"date": date(yr_a, 9, 1), "temp_max": 22.0, "temp_min": 12.0,
+             "temp_mean": 17.0, "precipitation": 0.5, "snowfall": 0.0,
+             "snow_depth_max": 0.0, "wind_max": 8.0, "humidity_mean": 60.0},
+            # yr_b: one valid, one None — year must still appear (valid record present)
+            {"date": date(yr_b, 4, 1), "temp_max": 15.0, "temp_min": 5.0,
+             "temp_mean": 10.0, "precipitation": 2.0, "snowfall": 0.0,
+             "snow_depth_max": 0.0, "wind_max": 12.0, "humidity_mean": 80.0},
+            {"date": date(yr_b, 10, 1), "temp_max": 12.0, "temp_min": 3.0,
+             "temp_mean": 7.0, "precipitation": 3.0, "snowfall": 0.0,
+             "snow_depth_max": 0.0, "wind_max": 11.0, "humidity_mean": None},
+            # yr_c: all None — year must be absent from result
+            {"date": date(yr_c, 5, 1), "temp_max": 18.0, "temp_min": 8.0,
+             "temp_mean": 13.0, "precipitation": 1.5, "snowfall": 0.0,
+             "snow_depth_max": 0.0, "wind_max": 9.0, "humidity_mean": None},
+            # current_year: must be excluded entirely regardless of humidity value
+            {"date": date(current_year, 1, 1), "temp_max": 5.0, "temp_min": -1.0,
+             "temp_mean": 2.0, "precipitation": 0.5, "snowfall": 0.1,
+             "snow_depth_max": 1.0, "wind_max": 7.0, "humidity_mean": 75.0},
+        ], yr_a, yr_b, yr_c, current_year
+
+    def test_result_sorted_by_year(self):
+        """yearly_humidity must return results in ascending year order."""
+        records, *_ = self._make_humidity_records()
+        result = yearly_humidity(records)
+        years = [r["year"] for r in result]
+        assert years == sorted(years), "years are not in ascending order"
+
+    def test_only_years_with_non_none_humidity_included(self):
+        """Years where all humidity_mean values are None must be absent from result."""
+        records, yr_a, yr_b, yr_c, current_year = self._make_humidity_records()
+        result = yearly_humidity(records)
+        result_years = {r["year"] for r in result}
+        # yr_a and yr_b have at least one non-None value, so they must appear
+        assert yr_a in result_years, f"yr_a ({yr_a}) should be in result"
+        assert yr_b in result_years, f"yr_b ({yr_b}) should be in result"
+        # yr_c has only None values, so it must be absent
+        assert yr_c not in result_years, (
+            f"yr_c ({yr_c}) has only None humidity, must not appear in result"
+        )
+
+    def test_current_year_excluded(self):
+        """yearly_humidity must never return an entry for the current calendar year."""
+        current_year = datetime.date.today().year
+        records, *_ = self._make_humidity_records()
+        result = yearly_humidity(records)
+        result_years = {r["year"] for r in result}
+        assert current_year not in result_years, (
+            f"Current year {current_year} must be excluded from yearly_humidity result"
+        )
+
+    def test_avg_humidity_excludes_none_in_average(self):
+        """None humidity values must not affect the computed average for the year."""
+        records, yr_a, yr_b, yr_c, current_year = self._make_humidity_records()
+        result = yearly_humidity(records)
+        by_year = {r["year"]: r for r in result}
+        # yr_a: (70.0 + 60.0) / 2 = 65.0
+        assert by_year[yr_a]["avg_humidity"] == pytest.approx(65.0, abs=0.01)
+        # yr_b: only the 80.0 record counts (None is skipped) → 80.0
+        assert by_year[yr_b]["avg_humidity"] == pytest.approx(80.0, abs=0.01)
+
+
+# ---------------------------------------------------------------------------
+# current_year_excluded (yearly_summary)
+# ---------------------------------------------------------------------------
+
+class TestCurrentYearExcluded:
+
+    def test_current_year_not_in_yearly_summary(self):
+        """yearly_summary must exclude records dated in the current calendar year."""
+        current_year = datetime.date.today().year
+        past_year = current_year - 1
+        records = [
+            # A record from the past year — must appear in output
+            {
+                "date": date(past_year, 6, 15), "temp_max": 25.0, "temp_min": 15.0,
+                "temp_mean": 20.0, "precipitation": 3.0, "snowfall": 0.0,
+                "snow_depth_max": 0.0, "wind_max": 12.0,
+            },
+            # Records from the current year — must be suppressed
+            {
+                "date": date(current_year, 1, 10), "temp_max": 8.0, "temp_min": 1.0,
+                "temp_mean": 4.5, "precipitation": 1.0, "snowfall": 0.5,
+                "snow_depth_max": 2.0, "wind_max": 15.0,
+            },
+            {
+                "date": date(current_year, 6, 20), "temp_max": 32.0, "temp_min": 22.0,
+                "temp_mean": 27.0, "precipitation": 0.0, "snowfall": 0.0,
+                "snow_depth_max": 0.0, "wind_max": 9.0,
+            },
+        ]
+        result = yearly_summary(records)
+        result_years = [s["year"] for s in result]
+        assert current_year not in result_years, (
+            f"Current year {current_year} must not appear in yearly_summary output; "
+            f"got years: {result_years}"
+        )

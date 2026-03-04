@@ -20,6 +20,7 @@ DAILY_VARIABLES = [
     "snowfall_sum",
     "snow_depth_max",
     "windspeed_10m_max",
+    "relativehumidity_2m_mean",
 ]
 
 def date_range_for_years(years: int) -> tuple[date, date]:
@@ -72,6 +73,7 @@ def _parse_daily(data: dict) -> list[dict]:
     snowfall   = daily["snowfall_sum"]
     snow_depth = daily["snow_depth_max"]
     wind_max   = daily["windspeed_10m_max"]
+    humidity   = daily.get("relativehumidity_2m_mean", [None] * len(dates))
 
     records = []
     for i, date_str in enumerate(dates):
@@ -84,5 +86,6 @@ def _parse_daily(data: dict) -> list[dict]:
             "snowfall":       float(snowfall[i])    if snowfall[i]    is not None else 0.0,
             "snow_depth_max": float(snow_depth[i])  if snow_depth[i]  is not None else 0.0,
             "wind_max":       float(wind_max[i])    if wind_max[i]    is not None else 0.0,
+            "humidity_mean":  float(humidity[i])    if humidity[i]    is not None else None,
         })
     return records

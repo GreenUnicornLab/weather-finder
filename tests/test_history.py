@@ -91,10 +91,11 @@ class TestParseDaily:
         assert len(result) == 2
 
     def test_required_keys_present(self):
-        """Each record must contain all 8 required keys."""
+        """Each record must contain all 9 required keys."""
         expected_keys = {
             "date", "temp_max", "temp_min", "temp_mean",
             "precipitation", "snowfall", "snow_depth_max", "wind_max",
+            "humidity_mean",
         }
         result = _parse_daily(MOCK_API_RESPONSE)
         for record in result:
@@ -222,7 +223,7 @@ class TestFetchHistorical:
 
     @patch("weather_alert.history.requests.get")
     def test_result_has_correct_structure(self, mock_get):
-        """Each record in the result must have the 8 expected keys."""
+        """Each record in the result must have the 9 expected keys."""
         mock_response = MagicMock()
         mock_response.json.return_value = MOCK_API_RESPONSE
         mock_response.raise_for_status.return_value = None
@@ -233,6 +234,7 @@ class TestFetchHistorical:
         expected_keys = {
             "date", "temp_max", "temp_min", "temp_mean",
             "precipitation", "snowfall", "snow_depth_max", "wind_max",
+            "humidity_mean",
         }
         assert len(result) > 0
         for record in result:

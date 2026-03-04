@@ -19,14 +19,20 @@ def yearly_summary(records: list[dict]) -> list[dict]:
     Input records have keys: date (datetime.date), temp_max, temp_min,
     temp_mean, precipitation, snowfall, snow_depth_max, wind_max.
 
+    Records from the current calendar year are excluded to avoid
+    incomplete-year bias.
+
     Returns list of dicts sorted by year with keys:
         year, avg_temp_max, avg_temp_min, avg_temp_mean,
         total_precipitation, total_snowfall, max_snow_depth,
         snow_days, rain_days, max_temp, min_temp,
         hottest_date, coldest_date
     """
+    current_year = date.today().year
     by_year: dict[int, list[dict]] = defaultdict(list)
     for r in records:
+        if r["date"].year == current_year:
+            continue
         by_year[r["date"].year].append(r)
 
     summaries = []
@@ -58,11 +64,17 @@ def yearly_summary(records: list[dict]) -> list[dict]:
 def monthly_climatology(records: list[dict]) -> list[dict]:
     """Average conditions per calendar month (1-12) across all years.
 
+    Records from the current calendar year are excluded to avoid
+    incomplete-year bias.
+
     Returns list of 12 dicts with keys:
         month (int 1-12), avg_temp_mean, avg_precipitation, avg_snowfall
     """
+    current_year = date.today().year
     by_month: dict[int, list[dict]] = defaultdict(list)
     for r in records:
+        if r["date"].year == current_year:
+            continue
         by_month[r["date"].month].append(r)
 
     result = []
@@ -227,3 +239,108 @@ def terminal_summary(
         sep,
     ]
     return "\n".join(lines)
+
+
+def seasonal_breakdown(records: list[dict]) -> dict:
+    """Break daily records into meteorological seasons per year.
+
+    Records from the current calendar year are excluded to avoid
+    incomplete-year bias.
+
+    Season definitions:
+        Winter  — Dec, Jan, Feb  (December belongs to the *next* year's winter)
+        Spring  — Mar, Apr, May
+        Summer  — Jun, Jul, Aug
+        Autumn  — Sep, Oct, Nov
+
+    Returns a nested dict::
+
+        {
+            year: {
+                season: {
+                    "avg_temp_mean":       float,
+                    "total_precipitation": float,
+                }
+            }
+        }
+
+    where ``year`` is the winter-adjusted year (so December 2010 appears
+    under year 2011, season "Winter").
+    """
+    current_year = date.today().year
+
+    SEASON_MAP = {
+        12: ("Winter", +1),  # December → next year's winter
+        1:  ("Winter",  0),
+        2:  ("Winter",  0),
+        3:  ("Spring",  0),
+        4:  ("Spring",  0),
+        5:  ("Spring",  0),
+        6:  ("Summer",  0),
+        7:  ("Summer",  0),
+        8:  ("Summer",  0),
+        9:  ("Autumn",  0),
+        10: ("Autumn",  0),
+        11: ("Autumn",  0),
+    }
+
+    # Accumulate totals and counts per (year, season)
+    buckets: dict[int, dict[str, dict[str, float | int]]] = defaultdict(
+        lambda: defaultdict(lambda: {"sum_temp": 0.0, "sum_precip": 0.0, "n": 0})
+    )
+
+    for r in records:
+        rec_year = r["date"].year
+        if rec_year == current_year:
+            continue
+        month = r["date"].month
+        season, year_offset = SEASON_MAP[month]
+        bucket_year = rec_year + year_offset
+        # After the year shift, skip if the resulting bucket year is current year
+        if bucket_year == current_year:
+            continue
+        b = buckets[bucket_year][season]
+        b["sum_temp"]   += r["temp_mean"]
+        b["sum_precip"] += r["precipitation"]
+        b["n"]          += 1
+
+    result: dict[int, dict[str, dict[str, float]]] = {}
+    for year in sorted(buckets):
+        result[year] = {}
+        for season, b in buckets[year].items():
+            n = b["n"]
+            result[year][season] = {
+                "avg_temp_mean":       round(b["sum_temp"] / n, 2) if n else 0.0,
+                "total_precipitation": round(b["sum_precip"], 1),
+            }
+    return result
+
+
+def yearly_humidity(records: list[dict]) -> list[dict]:
+    """Average relative humidity per year.
+
+    Records from the current calendar year are excluded to avoid
+    incomplete-year bias.  Records with a ``None`` value for
+    ``humidity_mean`` are also skipped.
+
+    Returns a list of dicts sorted by year::
+
+        [{"year": int, "avg_humidity": float}, ...]
+    """
+    current_year = date.today().year
+
+    by_year: dict[int, list[float]] = defaultdict(list)
+    for r in records:
+        if r["date"].year == current_year:
+            continue
+        h = r.get("humidity_mean")
+        if h is None:
+            continue
+        by_year[r["date"].year].append(float(h))
+
+    return [
+        {"year": year, "avg_humidity": round(sum(vals) / len(vals), 2)}
+        for year in sorted(by_year)
+        for vals in (by_year[year],)
+        if vals
+    ]
