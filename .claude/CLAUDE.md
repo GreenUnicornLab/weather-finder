@@ -95,11 +95,29 @@ Cannot mark a task complete until new files are committed.
 ## Python Project Conventions (weather-finder)
 
 - **Tests**: `pytest tests/` — delegate to `qa`
-- **Type checking**: `mypy app/` — delegate to `qa` or `python-engineer`
+- **Type checking**: `mypy src/` — delegate to `qa` or `python-engineer`
 - **Linting**: `ruff check .` and `ruff format .` — delegate to `python-engineer`
 - **Config**: `config.toml` for runtime settings, `pyproject.toml` for project metadata
-- **Entry points**: CLI via `python -m app.cli` or `weather-finder` command
+- **Entry points**:
+  - CLI: `weather-alert` command or `python -m weather_alert.cli` (package in `src/`)
+  - Dashboard: `streamlit run app/app.py` (current weather)
+  - History dashboard: `streamlit run app/history.py` (historical analysis)
 - **Notifications**: macOS `osascript` — delegate scheduling/process work to `local-ops`
+
+## Key Modules (src/weather_alert/)
+
+| Module | Purpose |
+|--------|---------|
+| `cli.py` | CLI entry point (`weather-alert` command) |
+| `weather.py` | Current weather fetching (Open-Meteo) |
+| `history.py` | Historical weather data fetching (Open-Meteo Archive API) |
+| `analysis.py` | Historical analysis engine (trends, stats) |
+| `chart.py` | Plotly chart generation |
+| `geocode.py` | Location geocoding |
+| `rules.py` | Alert rule evaluation |
+| `notify.py` | macOS notification dispatch |
+| `config.py` | Config loading from `config.toml` |
+| `utils.py` | Shared utilities |
 
 ---
 
