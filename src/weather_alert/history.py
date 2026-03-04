@@ -8,7 +8,8 @@ API docs: https://open-meteo.com/en/docs/historical-weather-api
 
 import requests
 from datetime import date, timedelta
-from weather_alert.utils import with_retry
+from weather_alert.utils import MAX_ATTEMPTS, RETRY_DELAY_SECONDS
+import time
 
 ARCHIVE_API_URL = "https://archive-api.open-meteo.com/v1/archive"
 
@@ -20,7 +21,8 @@ DAILY_VARIABLES = [
     "snowfall_sum",
     "snow_depth_max",
     "windspeed_10m_max",
-    "relativehumidity_2m_mean",
+    # "relativehumidity_2m_mean" is not a valid Open-Meteo archive field.
+    # Removed until the correct archive variable name is confirmed.
 ]
 
 def date_range_for_years(years: int) -> tuple[date, date]:
@@ -50,17 +52,28 @@ def fetch_historical(
         "longitude": longitude,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
-        "daily": ",".join(DAILY_VARIABLES),
+        "daily": DAILY_VARIABLES,
         "timezone": "auto",
     }
 
-    def _call() -> dict:
-        r = requests.get(ARCHIVE_API_URL, params=params, timeout=60)
-        r.raise_for_status()
-        return r.json()
-
-    data = with_retry(_call, label="Open-Meteo historical archive API")
-    return _parse_daily(data)
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            r = requests.get(ARCHIVE_API_URL, params=params, timeout=60)
+            r.raise_for_status()
+            data = r.json()
+            return _parse_daily(data)
+        except Exception as e:
+            last_error = e
+            print(f"[history] Attempt {attempt} failed: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"[history] Status: {e.response.status_code}")
+                print(f"[history] Response: {e.response.text[:200]}")
+            if attempt < MAX_ATTEMPTS:
+                time.sleep(RETRY_DELAY_SECONDS)
+    raise RuntimeError(
+        f"All {MAX_ATTEMPTS} attempts failed for Open-Meteo historical archive API."
+    ) from last_error
 
 def _parse_daily(data: dict) -> list[dict]:
     """Parse the Open-Meteo archive response into a list of daily record dicts."""
