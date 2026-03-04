@@ -70,10 +70,13 @@ def _season_label(year: int) -> str:
 def historical_seasons(records: list[dict]) -> list[dict]:
     """Group daily records into ski seasons (Nov 1 – Apr 30).
 
-    Only returns seasons that have data spanning at least Nov AND Jan (complete
-    enough to be meaningful). The current incomplete season is excluded.
+    Only returns past, completed seasons. The current running season is
+    excluded so it is never used as a historical comparator.
     Results sorted by season_label ascending.
     """
+    today = date.today()
+    current_season_year = today.year if today.month >= 10 else today.year - 1
+
     by_season: dict[int, list[dict]] = defaultdict(list)
     for r in records:
         sy = _season_year(r["date"])
@@ -82,6 +85,9 @@ def historical_seasons(records: list[dict]) -> list[dict]:
 
     seasons = []
     for sy, recs in sorted(by_season.items()):
+        # Exclude the current running season
+        if sy >= current_season_year:
+            continue
         months_present = {r["date"].month for r in recs}
         # Must have November (start) and January (past mid-season) to be valid
         if 11 not in months_present or 1 not in months_present:
@@ -177,11 +183,16 @@ def rate_season(season: dict, all_seasons: list[dict]) -> str:
 
 
 def get_current_season_data(records: list[dict]) -> list[dict]:
-    """Return records from Oct 1 of the current year to today (lead-in period)."""
+    """Return records from Oct 1 of the current ski-season year to today.
+
+    The 'current season year' is the Nov/Dec year of the running season.
+    e.g. in March 2026 the current season is 2025-26, so Oct 1 2025 is the start.
+    """
     today = date.today()
-    oct_1 = date(today.year, 10, 1)
-    if today < oct_1:
-        return []
+    # Determine which season we are in: months Oct-Dec belong to this calendar year,
+    # months Jan-Sep belong to the season that started the previous calendar year.
+    season_year = today.year if today.month >= 10 else today.year - 1
+    oct_1 = date(season_year, 10, 1)
     return sorted(
         [r for r in records if oct_1 <= r["date"] <= today],
         key=lambda r: r["date"],
@@ -337,12 +348,14 @@ def best_weeks_to_ski(hist_seasons: list[dict]) -> list[dict]:
             if wn not in accumulator:
                 accumulator[wn] = {
                     "depths": [],
+                    "snowfalls": [],
                     "powder_count": 0,
                     "day_count": 0,
                     "temps": [],
                 }
             acc = accumulator[wn]
             acc["depths"].append(r["snow_depth_max"])
+            acc["snowfalls"].append(r["snowfall"])
             acc["temps"].append(r["temp_mean"])
             acc["day_count"] += 1
             if r["snowfall"] > POWDER_THRESHOLD_CM:
@@ -353,6 +366,7 @@ def best_weeks_to_ski(hist_seasons: list[dict]) -> list[dict]:
         if not acc["depths"]:
             continue
         avg_depth = sum(acc["depths"]) / len(acc["depths"])
+        avg_snowfall = sum(acc["snowfalls"]) / len(acc["snowfalls"])
         powder_prob = (
             acc["powder_count"] / acc["day_count"] * 100 if acc["day_count"] > 0 else 0.0
         )
@@ -362,12 +376,15 @@ def best_weeks_to_ski(hist_seasons: list[dict]) -> list[dict]:
                 "week_num": wn,
                 "week_label": _week_label(wn),
                 "avg_snow_depth": avg_depth,
+                "avg_snowfall": avg_snowfall,
                 "powder_day_probability": powder_prob,
                 "avg_temp": avg_temp,
             }
         )
 
-    weeks.sort(key=lambda w: w["avg_snow_depth"], reverse=True)
+    # Rank by avg_snowfall (reliable across all elevations) rather than snow_depth
+    # which can be poorly calibrated in the archive API for mountain grid points.
+    weeks.sort(key=lambda w: w["avg_snowfall"], reverse=True)
     top5 = weeks[:5]
     for i, w in enumerate(top5):
         w["rank"] = i + 1
@@ -431,11 +448,11 @@ def terminal_summary(
     lines.append("🏔️  Best weeks to ski (historical):")
     for w in best_weeks:
         lbl = w["week_label"]
-        depth = round(w["avg_snow_depth"])
+        sf = round(w["avg_snowfall"], 1)
         powder = round(w["powder_day_probability"])
         temp = round(w["avg_temp"])
         lines.append(
-            f"  {w['rank']}. {lbl:<18} │ avg {depth}cm │ {powder}% powder days │ {temp}°C"
+            f"  {w['rank']}. {lbl:<18} │ {sf}cm/day avg │ {powder}% powder days │ {temp}°C"
         )
 
     lines.append("")
