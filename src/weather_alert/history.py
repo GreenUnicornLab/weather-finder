@@ -106,7 +106,7 @@ def _parse_daily(data: dict) -> list[dict]:
             "temp_mean":      float(temp_mean[i])   if temp_mean[i]   is not None else 0.0,
             "precipitation":  float(precip[i])      if precip[i]      is not None else 0.0,
             "snowfall":       float(snowfall[i])    if snowfall[i]    is not None else 0.0,
-            "snow_depth_max": float(snow_depth[i])  if snow_depth[i]  is not None else 0.0,
+            "snow_depth_max": float(snow_depth[i]) * 100.0 if snow_depth[i] is not None else 0.0,  # API returns metres → convert to cm
             "wind_max":       float(wind_max[i])    if wind_max[i]    is not None else 0.0,
             "humidity_mean":  float(humidity[i])    if humidity[i]    is not None else None,
         })

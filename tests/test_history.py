@@ -22,7 +22,7 @@ MOCK_API_RESPONSE = {
         "temperature_2m_mean": [1.5,  2.5],
         "precipitation_sum":   [2.0,  0.5],
         "snowfall_sum":        [1.0,  0.0],
-        "snow_depth_max":      [10.0, 9.0],
+        "snow_depth_max":      [0.10, 0.09],  # API returns metres (0.10 m = 10 cm)
         "windspeed_10m_max":   [25.0, 18.0],
     }
 }
@@ -133,7 +133,7 @@ class TestParseDaily:
         assert r0["temp_mean"]      == 1.5
         assert r0["precipitation"]  == 2.0
         assert r0["snowfall"]       == 1.0
-        assert r0["snow_depth_max"] == 10.0
+        assert r0["snow_depth_max"] == pytest.approx(10.0)  # 0.10 m * 100 = 10 cm
         assert r0["wind_max"]       == 25.0
 
     def test_none_api_values_become_zero(self):
