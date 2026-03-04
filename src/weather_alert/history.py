@@ -60,6 +60,15 @@ def fetch_historical(
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             r = requests.get(ARCHIVE_API_URL, params=params, timeout=60)
+            # 429 = rate-limited: wait 65 s then retry (Open-Meteo resets per minute)
+            if r.status_code == 429:
+                wait = 65
+                print(
+                    f"[history] Rate-limited (429). "
+                    f"Waiting {wait}s before retry {attempt}/{MAX_ATTEMPTS}…"
+                )
+                time.sleep(wait)
+                continue
             r.raise_for_status()
             data = r.json()
             return _parse_daily(data)
