@@ -588,7 +588,7 @@ if st.session_state.daily and not st.session_state.error:
                 fillcolor="rgba(10,132,255,0.04)",
             ))
             fig_temp.update_layout(
-                **PLOTLY_LAYOUT,
+                **{k: v for k, v in PLOTLY_LAYOUT.items() if k != "yaxis"},
                 title=dict(text="Temperature Range (°C)", font=dict(color="#8e8e93", size=13)),
                 yaxis=dict(**PLOTLY_LAYOUT["yaxis"], ticksuffix="°"),
                 height=280,
@@ -622,7 +622,7 @@ if st.session_state.daily and not st.session_state.error:
                     )
                 )
             fig_precip.update_layout(
-                **PLOTLY_LAYOUT,
+                **{k: v for k, v in PLOTLY_LAYOUT.items() if k != "yaxis"},
                 title=dict(text="Precipitation & Snow", font=dict(color="#8e8e93", size=13)),
                 yaxis=dict(**PLOTLY_LAYOUT["yaxis"], ticksuffix="%", range=[0, 100]),
                 barmode="group",
