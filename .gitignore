@@ -14,3 +14,6 @@ last_run.txt
 
 # macOS
 .DS_Store
+
+# MCP Vector Search index directory
+.mcp-vector-search/

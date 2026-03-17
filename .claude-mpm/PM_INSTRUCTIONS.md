@@ -1021,6 +1021,39 @@ For example:
 ## Available Agent Capabilities
 
 
+### API Qa (`API QA`)
+Specialized API and backend testing for REST, GraphQL, and server-side functionality
+
+### Agentic Coder Optimizer (`Agentic Coder Optimizer`)
+Optimizes projects for agentic coders with single-path standards, clear documentation, and unified tooling workflows.
+- **Memory Routing**: Stores project optimization patterns, documentation structures, and workflow standardization strategies
+
+### Clerk Operations (`Clerk Operations`)
+Specialized agent for setting up and managing Clerk authentication in both local development and production environments. Expert in handling dynamic localhost ports, webhook configuration, middleware setup, and troubleshooting common authentication issues.
+- **Memory Routing**: Stores Clerk authentication patterns, configuration templates, and troubleshooting solutions
+
+### Code Analysis (`Code Analysis`)
+Multi-language code analysis with AST parsing and Mermaid diagram visualization
+
+### Content Optimization (`Content Optimization`)
+Website content quality specialist for text optimization, SEO, readability, and accessibility improvements
+- **Memory Routing**: Stores content strategies, SEO optimization patterns, accessibility guidelines, and brand voice consistency
+
+### Dart Engineer (`Dart Engineer`)
+Specialized Dart/Flutter engineer for cross-platform mobile, web, and desktop development (2025 best practices)
+- **Memory Routing**: Stores Dart/Flutter development patterns, state management implementations, performance optimizations, and cross-platform best practices
+
+### Data Engineer (`Data Engineer`)
+Python-powered data transformation specialist for file conversions, ETL pipelines, database migrations, and data processing
+- **Memory Routing**: Stores data pipeline patterns, database migration strategies, schema designs, and performance tuning techniques
+
+### Data Scientist (`Data Scientist`)
+Data science specialist for exploratory data analysis, statistical modeling, ML pipelines, data visualization, and feature engineering with Python data stack (pandas, numpy, scikit-learn, matplotlib, seaborn)
+
+### Digitalocean Ops (`DigitalOcean Ops`)
+DigitalOcean operations agent specializing in secure account setup, infrastructure provisioning, and day-2 operations across compute, storage, databases, networking, and team management
+- **Model**: sonnet
+
 ### Documentation Agent (`Documentation Agent`)
 Memory-efficient documentation generation, reorganization, and management with semantic search and strategic content sampling
 - **Memory Routing**: Stores writing standards, content organization patterns, documentation conventions, and semantic search patterns
@@ -1029,20 +1062,138 @@ Memory-efficient documentation generation, reorganization, and management with s
 Clean architecture specialist with code reduction and dependency injection
 - **Memory Routing**: Stores implementation patterns, code architecture decisions, and technical optimizations
 
+### Golang Engineer (`Golang Engineer`)
+Go 1.23-1.24 specialist: concurrent systems, goroutine patterns, interface-based design, high-performance idiomatic Go
+- **Memory Routing**: Stores Go patterns, concurrency implementations, interface designs, and performance optimizations
+
+### Google Cloud Ops (`Google Cloud Ops`)
+Specialized agent for Google Cloud Platform operations, authentication, and resource management
+- **Memory Routing**: Stores GCP authentication configurations, resource deployments, IAM structures, and operational patterns
+
+### Imagemagick (`Imagemagick`)
+Image optimization specialist using ImageMagick for web performance, format conversion, and responsive image generation
+
+### Java Engineer (`Java Engineer`)
+Java 21+ LTS specialist delivering production-ready Spring Boot applications with virtual threads, pattern matching, modern performance optimizations, and comprehensive JUnit 5 testing
+- **Memory Routing**: Stores Java patterns, Spring Boot configurations, architectural decisions, performance optimizations, and testing strategies
+
+### Javascript Engineer (`Javascript Engineer`)
+Vanilla JavaScript specialist: Node.js backend (Express, Fastify, Koa), browser extensions, Web Components, modern ESM patterns, build tooling
+- **Memory Routing**: Stores modern JavaScript patterns, backend framework configurations, browser APIs, Web Component implementations, and build tool setups
+
+### Local Ops (`Local Ops`)
+Local operations specialist for deployment, DevOps, and process management
+
+### Memory Manager (`Memory Manager`)
+Manages project-specific agent memories for improved context retention and knowledge accumulation with dynamic runtime loading
+
+### Nextjs Engineer (`Nextjs Engineer`)
+Next.js 15+ specialist: App Router, Server Components, Partial Prerendering, performance-first React applications
+- **Memory Routing**: Stores Next.js patterns, Server Components architecture, performance optimizations, and deployment strategies
+
 ### Ops (`Ops`)
 Infrastructure automation with IaC validation and container security
 - **Memory Routing**: Stores deployment patterns, infrastructure configurations, and monitoring strategies
+
+### Phoenix Engineer (`Phoenix Engineer`)
+Elixir/Phoenix specialist for building web applications, APIs, and LiveView experiences with solid OTP and Ecto foundations
+- **Routing**: Keywords: phoenix, elixir, liveview, ecto | Paths: mix.exs, config/config.exs | Priority: 120
+
+### Php Engineer (`Php Engineer`)
+PHP 8.4-8.5 + Laravel 11-12 specialist: strict types, modern security (WebAuthn/passkeys), performance-first applications
+- **Memory Routing**: Stores PHP patterns, Laravel architecture, security implementations, and performance optimizations
+
+### Product Owner (`Product Owner`)
+Modern product ownership specialist: evidence-based decisions, outcome-focused planning, RICE prioritization, continuous discovery
+- **Memory Routing**: Stores product strategy decisions, prioritization frameworks, user research insights, roadmap plans, OKRs, metrics definitions, and stakeholder alignment patterns
+
+### Project Organizer (`Project Organizer`)
+Intelligent project file organization manager that learns patterns and enforces consistent structure
+
+### Prompt Engineer (`Prompt Engineer`)
+Expert prompt engineer specializing in Claude 4.5 optimization: model selection, extended thinking, tool orchestration, structured output, and context management. Analyzes and refactors system prompts with focus on cost/performance trade-offs.
+
+### Python Engineer (`Python Engineer`)
+Python 3.12+ development specialist: type-safe, async-first, production-ready implementations with SOA and DI patterns
+- **Memory Routing**: Stores Python patterns, architectural decisions, performance optimizations, type system usage, and testing strategies
 
 ### Qa (`QA`)
 Memory-efficient testing with strategic sampling, targeted validation, and smart coverage analysis
 - **Memory Routing**: Stores testing strategies, quality standards, and bug patterns
 
+### React Engineer (`React Engineer`)
+Specialized React development engineer focused on modern React patterns, performance optimization, and component architecture
+- **Memory Routing**: Stores React development patterns, component architectures, and performance optimization strategies
+
+### Refactoring Engineer (`Refactoring Engineer`)
+Safe, incremental code improvement specialist focused on behavior-preserving transformations with comprehensive testing
+
 ### Research (`Research`)
 Memory-efficient codebase analysis with required ticket attachment when ticket context exists, optional mcp-skillset enhancement, and Google Workspace integration for calendar, email, and Drive research
 - **Memory Routing**: Stores analysis findings, domain knowledge, architectural decisions, skill recommendations, and work capture patterns
 
+### Ruby Engineer (`Ruby Engineer`)
+Ruby 3.4 + YJIT + Rails 8 specialist: 30% faster method calls, Kamal deployment, service objects, production-ready Rails applications
+- **Memory Routing**: Stores Ruby patterns, Rails architecture, YJIT optimizations, RSpec strategies, and deployment configurations
+
+### Rust Engineer (`Rust Engineer`)
+Rust 2024 edition specialist: memory-safe systems, zero-cost abstractions, ownership/borrowing mastery, async patterns with tokio, trait-based service architecture with dependency injection
+- **Memory Routing**: Stores Rust patterns, ownership strategies, async implementations, and performance optimizations
+
+### Security (`Security`)
+Advanced security scanning with SAST, attack vector detection, parameter validation, and vulnerability assessment
+- **Memory Routing**: Stores security patterns, threat models, attack vectors, and compliance requirements
+
+### Svelte Engineer (`Svelte Engineer`)
+Specialized agent for modern Svelte 5 (Runes API) and SvelteKit development. Expert in reactive state management with $state, $derived, $effect, and $props. Provides production-ready code following Svelte 5 best practices with TypeScript integration. Supports legacy Svelte 4 patterns when needed.
+- **Memory Routing**: Stores Svelte 5 patterns, Runes usage, and performance optimizations
+
+### Tauri Engineer (`Tauri Engineer`)
+Tauri desktop application specialist: hybrid web UI + Rust backend, IPC patterns, state management, system integration, cross-platform development with <10MB bundle sizes
+- **Memory Routing**: Stores Tauri development patterns, IPC implementations, security configurations, and cross-platform integration strategies
+
+### Tmux Agent (`Tmux Agent`)
+Specialized agent for interacting with tmux sessions - attaching to sessions, sending commands, capturing output, and managing terminal multiplexer workflows. Provides tmux control for monitoring and interacting with long-running processes, development servers, and remote sessions.
+- **Memory Routing**: Stores tmux session patterns, command sequences, timing strategies, and interactive application workflows
+
+### Typescript Engineer (`Typescript Engineer`)
+TypeScript 5.6+ specialist: strict type safety, branded types, performance-first, modern build tooling
+- **Memory Routing**: Stores TypeScript patterns, branded types, build configurations, performance techniques, and testing strategies
+
+### Vercel Ops (`Vercel Ops`)
+Enterprise-grade Vercel operations agent specializing in security-first environment management, advanced deployment strategies, team collaboration workflows, and comprehensive platform optimization
+
+### Version Control (`Version Control`)
+Git operations with commit validation and branch strategy enforcement
+- **Memory Routing**: Stores branching strategies, commit standards, and release management patterns
+
+### Visual Basic Engineer (`Visual Basic Engineer`)
+Visual Basic 6 and VB.NET specialist delivering Windows applications with COM integration, type safety, and comprehensive testing
+
 ### Web Qa (`Web QA`)
 Progressive 6-phase web testing with UAT mode for business intent verification, behavioral testing, and comprehensive acceptance validation alongside technical testing
+
+### Web Ui (`Web UI`)
+Front-end web specialist with expertise in HTML5, CSS3, JavaScript, responsive design, accessibility, and user interface implementation
+
+### Aws_Ops_Agent (`aws_ops_agent`)
+AWS operations specialist for EC2, S3, Lambda, RDS, IAM, CloudWatch, and VPC management
+- **Authority**: {'git_commit': True, 'file_operations': True, 'environment_config': True}
+- **Model**: sonnet
+
+### Mpm_Agent_Manager (`mpm_agent_manager`)
+Manages agent lifecycle including discovery, configuration, deployment, and PR-based improvements to the agent repository
+
+### Mpm_Skills_Manager (`mpm_skills_manager`)
+Manages skill lifecycle including discovery, recommendation, deployment, and PR-based improvements to the skills repository
+
+### Nestjs Engineer (`nestjs-engineer`)
+Use this agent when you need to implement NestJS-specific features, build REST APIs, integrate MongoDB with Mongoose, implement authentication/authorization, or work with Bull queues. This agent specializes in NestJS 10+ architecture patterns, dependency injection, decorators, and testing.
+<example> Context: Authentication system with JWT and Passport user: "I need to implement JWT authentication with role-based access control" assistant: "I'll use the nestjs-engineer agent to create Guards with @nestjs/passport, JWT strategy, role decorators, and protected routes with proper error handling." <commentary> This agent is well-suited for JWT authentication because it specializes in @nestjs/passport, Guards, decorators, and authentication patterns with targeted expertise. </commentary> </example>
+- **Model**: sonnet
+
+### Real User (`real-user`)
+Persona-based behavioral testing agent that simulates realistic user interactions. Configures user personas with varying tech savviness, patience, and device preferences to test applications from authentic user perspectives.
 
 ### Ticketing_Agent (`ticketing_agent`)
 Intelligent ticket management using mcp-ticketer MCP server (primary) with aitrackdown CLI fallback
@@ -1055,12 +1206,12 @@ Select agents based on their descriptions above. Key principles:
 - Consider agent handoff recommendations
 - Use the agent ID in parentheses when delegating via Task tool
 
-**Total Available Agents**: 7
+**Total Available Agents**: 48
 
 
 ## Temporal & User Context
-**Current DateTime**: 2026-02-23 15:14:46 CEST (UTC+01:00)
-**Day**: Monday
+**Current DateTime**: 2026-03-04 21:57:30 CEST (UTC+01:00)
+**Day**: Wednesday
 **User**: asantosduetto
 **Home Directory**: /Users/asantosduetto
 **System**: Darwin (macOS)

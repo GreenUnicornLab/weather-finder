@@ -1,25 +1,35 @@
 skills:
   agent_referenced:
   - anthropic-sdk
+  - api-design-patterns
   - api-documentation
+  - api-security-review
+  - asyncio
   - brainstorming
   - bug-fix-verification
+  - celery
   - condition-based-waiting
   - database-migration
   - dependency-audit
   - dispatching-parallel-agents
+  - django
   - docker
   - dspy
   - emergency-release-workflow
   - env-manager
+  - fastapi-local-dev
+  - flask
   - git-workflow
   - git-worktrees
   - github-actions
+  - graphql
   - internal-comms
   - json-data-handling
   - langchain
   - langgraph
   - mcp
+  - mcp-builder
+  - mpm-agent-update-workflow
   - mpm-bug-reporting
   - mpm-circuit-breaker-enforcement
   - mpm-delegation-patterns
@@ -30,11 +40,15 @@ skills:
   - mpm-ticketing-integration
   - mpm-tool-usage-guide
   - mpm-verification-protocols
+  - mypy
   - netlify
   - openrouter
   - playwright
   - pr-quality-checklist
   - pre-merge-verification
+  - pydantic
+  - pyright
+  - pytest
   - requesting-code-review
   - root-cause-tracing
   - screenshot-verification
@@ -42,14 +56,30 @@ skills:
   - session-compression
   - skill-creator
   - software-patterns
+  - sqlalchemy
   - stacked-prs
+  - supabase
   - systematic-debugging
   - test-driven-development
   - test-quality-inspector
   - testing-anti-patterns
+  - toolchains-nextjs-api-validated-handler
+  - toolchains-python-data-sqlalchemy
+  - toolchains-python-validation-pydantic
+  - toolchains-typescript-data-drizzle-migrations
+  - toolchains-typescript-validation-zod
+  - toolchains-universal-dead-code-elimination
+  - toolchains-universal-dependency-audit
+  - toolchains-universal-infrastructure-github-actions
+  - toolchains-universal-security-api-review
+  - universal-data-database-migration
+  - universal-debugging-systematic-debugging
+  - universal-debugging-verification-before-completion
+  - universal-operations-emergency-release
   - vercel-overview
   - verification-before-completion
   - web-performance-optimization
   - webapp-testing
   - writing-plans
+  - xlsx
   user_defined: []
