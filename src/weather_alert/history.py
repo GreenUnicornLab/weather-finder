@@ -26,9 +26,17 @@ DAILY_VARIABLES = [
 ]
 
 def date_range_for_years(years: int) -> tuple[date, date]:
-    """Return (start_date, end_date) for the past N years ending yesterday."""
+    """Return (start_date, end_date) for the past N years ending yesterday.
+
+    Handles the Feb 29 edge case: if end is Feb 29 and the target year is not
+    a leap year, falls back to Feb 28.
+    """
     end = date.today() - timedelta(days=1)
-    start = end.replace(year=end.year - years)
+    try:
+        start = end.replace(year=end.year - years)
+    except ValueError:
+        # end is Feb 29 and (end.year - years) is not a leap year
+        start = end.replace(month=2, day=28, year=end.year - years)
     return start, end
 
 def fetch_historical(

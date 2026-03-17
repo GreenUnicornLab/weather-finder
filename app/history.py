@@ -303,11 +303,13 @@ def stat_html(label: str, value: str, unit: str = "") -> str:
 
 
 def _fmt_date(d: date | None) -> str:
-    """Format a date as '%-d %b %Y', returning '—' for None."""
+    """Format a date as '%-d %b %Y' (or '%#d %b %Y' on Windows), returning '—' for None."""
+    import sys
     if d is None:
         return "—"
     try:
-        return d.strftime("%-d %b %Y")
+        day_fmt = "%-d" if sys.platform != "win32" else "%#d"
+        return d.strftime(f"{day_fmt} %b %Y")
     except Exception:
         return str(d)
 

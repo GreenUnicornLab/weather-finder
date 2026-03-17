@@ -18,7 +18,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from datetime import datetime
 
-from weather_alert.geocode import geocode
+from weather_alert.geocode import geocode, LocationNotFoundError
 from weather_alert.weather import fetch_forecast, fetch_daily_forecast
 from weather_alert.rules import evaluate_rules
 
@@ -327,7 +327,7 @@ def fetch_all(place: str, days: int) -> None:
     st.session_state.error = None
     try:
         loc = geocode(place)
-    except SystemExit:
+    except LocationNotFoundError:
         st.session_state.error = f'Location "{place}" not found. Try a more specific name.'
         st.session_state.location = None
         return
@@ -406,6 +406,7 @@ if st.session_state.hourly and not st.session_state.error:
             "wind_speed_threshold": 30,
             "feels_like_min": 2,
             "lookahead_hours": 3,
+            "temperature_min": 0,
         }
     }
     # Try to load real config; fall back to mock

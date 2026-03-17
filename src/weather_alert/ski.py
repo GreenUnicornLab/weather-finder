@@ -261,7 +261,7 @@ def get_current_season_data(records: list[dict]) -> list[dict]:
 # ── Prediction ────────────────────────────────────────────────────────────────
 
 
-def _day_offset(d: date, season_year: int) -> int:
+def day_offset(d: date, season_year: int) -> int:
     """Days since Oct 1 of season_year (Oct 1 = offset 0)."""
     return (d - date(season_year, 10, 1)).days
 
@@ -292,7 +292,7 @@ def predict_current_season(
 
     # Build current depth lookup by day offset
     cur_depth: dict[int, float] = {
-        _day_offset(r["date"], current_year): r["snow_depth_max"]
+        day_offset(r["date"], current_year): r["snow_depth_max"]
         for r in current_data
     }
     max_offset = max(cur_depth.keys())
@@ -303,7 +303,7 @@ def predict_current_season(
     for season in hist_seasons:
         sy = season["season_year"]
         hist_depth: dict[int, float] = {
-            _day_offset(r["date"], sy): r["snow_depth_max"]
+            day_offset(r["date"], sy): r["snow_depth_max"]
             for r in season["records"]
         }
         common = [o for o in range(max_offset + 1) if o in hist_depth]
@@ -344,7 +344,7 @@ def predict_current_season(
     for season in hist_seasons:
         sy = season["season_year"]
         for r in season["records"]:
-            if _day_offset(r["date"], sy) == max_offset:
+            if day_offset(r["date"], sy) == max_offset:
                 avg_depths.append(r["snow_depth_max"])
                 break
     hist_avg = sum(avg_depths) / len(avg_depths) if avg_depths else 0.0
@@ -366,7 +366,7 @@ def predict_current_season(
 # ── Best Weeks ────────────────────────────────────────────────────────────────
 
 
-def _ski_season_week(d: date, season_year: int) -> int | None:
+def ski_season_week(d: date, season_year: int) -> int | None:
     """0-indexed week within the ski season. Week 0 = Nov 1-7.
     Returns None if outside Nov 1 – Apr 30.
     """
@@ -377,7 +377,7 @@ def _ski_season_week(d: date, season_year: int) -> int | None:
     return (d - nov_1).days // 7
 
 
-def _week_label(week_num: int) -> str:
+def week_label(week_num: int) -> str:
     """Canonical week label e.g. 'Jan 15 – Jan 21' (using 2024/25 as reference)."""
     ref_nov_1 = date(2024, 11, 1)
     start = ref_nov_1 + timedelta(days=week_num * 7)
@@ -401,7 +401,7 @@ def best_weeks_to_ski(hist_seasons: list[dict]) -> list[dict]:
     for season in hist_seasons:
         sy = season["season_year"]
         for r in season["records"]:
-            wn = _ski_season_week(r["date"], sy)
+            wn = ski_season_week(r["date"], sy)
             if wn is None or wn > 25:
                 continue
             if wn not in accumulator:
@@ -433,7 +433,7 @@ def best_weeks_to_ski(hist_seasons: list[dict]) -> list[dict]:
         weeks.append(
             {
                 "week_num": wn,
-                "week_label": _week_label(wn),
+                "week_label": week_label(wn),
                 "avg_snow_depth": avg_depth,
                 "avg_snowfall": avg_snowfall,
                 "powder_day_probability": powder_prob,
@@ -441,9 +441,7 @@ def best_weeks_to_ski(hist_seasons: list[dict]) -> list[dict]:
             }
         )
 
-    # Rank by avg_snowfall (reliable across all elevations) rather than snow_depth
-    # which can be poorly calibrated in the archive API for mountain grid points.
-    weeks.sort(key=lambda w: w["avg_snowfall"], reverse=True)
+    weeks.sort(key=lambda w: w["avg_snow_depth"], reverse=True)
     top5 = weeks[:5]
     for i, w in enumerate(top5):
         w["rank"] = i + 1

@@ -299,12 +299,12 @@ def load_ski_data(location: str) -> dict:
     current_year = today.year if today.month >= 10 else today.year - 1
 
     # Build historical avg + min/max depth by day-of-year offset (for the tracker chart)
-    from weather_alert.ski import _day_offset  # noqa: PLC0415
+    from weather_alert.ski import day_offset  # noqa: PLC0415
     depth_by_offset: dict[int, list[float]] = defaultdict(list)
     for season in seasons:
         sy = season["season_year"]
         for r in season["records"]:
-            off = _day_offset(r["date"], sy)
+            off = day_offset(r["date"], sy)
             depth_by_offset[off].append(r["snow_depth_max"])
 
     # Monthly avg snowfall (historical) for months Nov–Apr
@@ -326,14 +326,14 @@ def load_ski_data(location: str) -> dict:
             monthly_current[r["date"].month] += r["snowfall"]
 
     # Build week × year heatmap matrix
-    from weather_alert.ski import _ski_season_week  # noqa: PLC0415
+    from weather_alert.ski import ski_season_week  # noqa: PLC0415
     week_year_matrix: dict[tuple[int, int], float] = {}
     season_years = sorted({s["season_year"] for s in seasons})
     for season in seasons:
         sy = season["season_year"]
         week_depths: dict[int, list[float]] = defaultdict(list)
         for r in season["records"]:
-            wn = _ski_season_week(r["date"], sy)
+            wn = ski_season_week(r["date"], sy)
             if wn is not None and wn <= 25:
                 week_depths[wn].append(r["snow_depth_max"])
         for wn, depths in week_depths.items():
@@ -464,12 +464,12 @@ def main() -> None:
 
     depth_by_offset = data["depth_by_offset"]
     if current_data:
-        from weather_alert.ski import _day_offset  # noqa: PLC0415
+        from weather_alert.ski import day_offset  # noqa: PLC0415
         cur_offsets = sorted(
-            _day_offset(r["date"], current_year) for r in current_data
+            day_offset(r["date"], current_year) for r in current_data
         )
         cur_depths = {
-            _day_offset(r["date"], current_year): r["snow_depth_max"]
+            day_offset(r["date"], current_year): r["snow_depth_max"]
             for r in current_data
         }
         x_dates = [
@@ -559,14 +559,14 @@ def main() -> None:
         season_years_list = data["season_years"]
 
         # Build all-weeks list for horizontal bar
-        from weather_alert.ski import _week_label  # noqa: PLC0415
+        from weather_alert.ski import week_label  # noqa: PLC0415
         from collections import defaultdict as _dd
 
         all_week_depths: dict[int, list[float]] = _dd(list)
         for season in seasons:
-            from weather_alert.ski import _ski_season_week  # noqa: PLC0415
+            from weather_alert.ski import ski_season_week  # noqa: PLC0415
             for r in season["records"]:
-                wn = _ski_season_week(r["date"], season["season_year"])
+                wn = ski_season_week(r["date"], season["season_year"])
                 if wn is not None and wn <= 25:
                     all_week_depths[wn].append(r["snow_depth_max"])
 
@@ -574,7 +574,7 @@ def main() -> None:
             [
                 {
                     "wn": wn,
-                    "label": _week_label(wn),
+                    "label": week_label(wn),
                     "avg": sum(v) / len(v) if v else 0,
                 }
                 for wn, v in all_week_depths.items()
@@ -618,7 +618,7 @@ def main() -> None:
             z_matrix.append(row)
             y_labels_hm.append(str(sy))
 
-        x_labels_hm = [_week_label(wn) for wn in all_wns]
+        x_labels_hm = [week_label(wn) for wn in all_wns]
 
         fig3b = go.Figure(
             go.Heatmap(

@@ -27,7 +27,7 @@ alert:
 	.venv/bin/weather-alert run-once
 
 install:
-	pip install -e ".[ui,dev]"
+	.venv/bin/pip install -e ".[ui,dev]"
 
 test:
 	.venv/bin/pytest tests/ -q

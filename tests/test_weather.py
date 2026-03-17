@@ -219,3 +219,17 @@ def test_fetch_daily_forecast_raises_on_bad_response():
         )
         with pytest.raises(RuntimeError, match="Unexpected API response structure"):
             fetch_daily_forecast(latitude=51.5, longitude=-0.1, forecast_days=1)
+
+
+def test_fetch_daily_forecast_snow_depth_cm_conversion():
+    """snow_depth_max from the API is in metres; result snow_depth_cm must be metres * 100."""
+    raw_meters = 0.35  # 0.35 m = 35 cm
+    payload = _make_daily_payload(n=1)
+    payload["daily"]["snow_depth_max"] = [raw_meters]
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            "weather_alert.weather.with_retry",
+            lambda fn, **kw: payload,
+        )
+        result = fetch_daily_forecast(latitude=51.5, longitude=-0.1, forecast_days=1)
+    assert result[0]["snow_depth_cm"] == pytest.approx(raw_meters * 100)

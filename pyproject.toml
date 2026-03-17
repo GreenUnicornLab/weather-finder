@@ -17,8 +17,8 @@ maintainers = [
 dependencies = ["requests>=2.28"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-cov", "mypy"]
-ui = ["streamlit", "plotly"]
+dev = ["pytest", "pytest-cov", "mypy", "ruff", "types-requests"]
+ui = ["streamlit", "plotly", "pandas"]
 
 [project.scripts]
 weather-alert = "weather_alert.cli:main"

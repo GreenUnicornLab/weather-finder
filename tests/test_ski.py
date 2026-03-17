@@ -262,12 +262,47 @@ class TestBestWeeksToSki:
         assert len(result) == 5
 
     def test_sorted_by_avg_snow_depth_descending(self):
-        """Weeks must be ranked with highest avg_snow_depth first."""
-        recs = season_records(2018) + season_records(2019) + season_records(2020)
+        """Weeks must be ranked by avg_snow_depth, NOT avg_snowfall.
+
+        Build seasons where avg_snowfall is uniform (5 cm/day everywhere) but
+        snow_depth deliberately varies week-by-week, so only a sort by
+        avg_snow_depth produces a strictly-descending order.
+        """
+        from datetime import date as _date
+
+        def make_varied_season(season_year: int) -> list[dict]:
+            """Season with snowfall=5 everywhere but snow_depth decreasing week by week."""
+            records = []
+            nov_1 = _date(season_year, 11, 1)
+            for month in (11, 12):
+                days_in = 30 if month == 11 else 31
+                for day in range(1, days_in + 1):
+                    d = _date(season_year, month, day)
+                    # week 0 depth=100, week 1 depth=99, …
+                    week = (d - nov_1).days // 7
+                    depth = max(1.0, 100.0 - week * 3)
+                    records.append(make_record(d, 5.0, depth, -5.0))
+            for month, days in ((1, 31), (2, 28), (3, 31), (4, 30)):
+                for day in range(1, days + 1):
+                    d = _date(season_year + 1, month, day)
+                    week = (d - nov_1).days // 7
+                    depth = max(1.0, 100.0 - week * 3)
+                    records.append(make_record(d, 5.0, depth, -5.0))
+            return records
+
+        recs = make_varied_season(2018) + make_varied_season(2019) + make_varied_season(2020)
         seasons = historical_seasons(recs)
         result = best_weeks_to_ski(seasons)
         depths = [w["avg_snow_depth"] for w in result]
+        # Must be sorted descending by depth
         assert depths == sorted(depths, reverse=True)
+        # Snowfall is uniform — sorting by snowfall would not produce this order
+        # (all avg_snowfall values are equal, so any permutation would satisfy
+        # a snowfall-based sort, but the depths would not be in descending order
+        # unless we explicitly sort by depth)
+        snowfalls = [w["avg_snowfall"] for w in result]
+        # Verify snowfall is indeed uniform (all equal) in this dataset
+        assert len(set(round(s, 6) for s in snowfalls)) == 1
 
     def test_ranks_are_1_through_5(self):
         """Ranks must be consecutive integers 1-5."""

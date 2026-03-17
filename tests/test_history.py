@@ -73,6 +73,26 @@ class TestDateRangeForYears:
         start, end = date_range_for_years(50)
         assert start.year == end.year - 50
 
+    def test_feb29_leap_year_end_to_non_leap_year(self):
+        """If end is Feb 29 (leap year) and target year is not a leap year,
+        start must be Feb 28 of the target year (no ValueError raised).
+        """
+        from unittest.mock import patch
+
+        # 2024 is a leap year; 2024 - 3 = 2021 is not a leap year
+        fake_today = date(2024, 3, 1)  # so yesterday = Feb 29 2024
+        with patch("weather_alert.history.date") as mock_date:
+            mock_date.today.return_value = fake_today
+            mock_date.fromisoformat = date.fromisoformat
+            # Call the real implementation (not the mock), passing the mocked today
+            # We patch date.today inside the module so date_range_for_years uses it
+            start, end = date_range_for_years(3)
+
+        assert end == date(2024, 2, 29)
+        assert start.month == 2
+        assert start.day == 28
+        assert start.year == 2021
+
 
 # ---------------------------------------------------------------------------
 # _parse_daily

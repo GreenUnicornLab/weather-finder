@@ -9,6 +9,7 @@ Linear regression uses the closed-form OLS formula.
 """
 
 from __future__ import annotations
+import sys
 from collections import defaultdict
 from datetime import date
 
@@ -220,7 +221,8 @@ def terminal_summary(
     def fmt_date(d: date | None) -> str:
         if d is None:
             return "unknown"
-        return d.strftime("%-d %b %Y")
+        day_fmt = "%-d" if sys.platform != "win32" else "%#d"
+        return d.strftime(f"{day_fmt} %b %Y")
 
     lines = [
         f"📍 {location_name} — {n_years}-year Historical Analysis ({start_yr}–{end_yr})",

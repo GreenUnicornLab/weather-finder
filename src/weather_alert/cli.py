@@ -622,12 +622,13 @@ def cmd_history(args: argparse.Namespace) -> None:
     history_app = Path(__file__).parent.parent.parent / "app" / "history.py"
     if history_app.exists():
         print("[weather] Launching Streamlit dashboard…")
-        subprocess.run([
+        subprocess.Popen([
             sys.executable, "-m", "streamlit", "run",
             str(history_app), "--",
             "--location", location,
             "--years", str(years),
         ])
+        print("[weather] Dashboard running at http://localhost:8501")
     else:
         print(f"[weather] Dashboard not found at {history_app}", file=sys.stderr)
 
